@@ -1,4 +1,5 @@
-import type { Chat, LlmParams, Settings, StPreset } from "./types.ts";
+import type { Chat, LlmParams, Settings, StPreset, StPromptItem } from "./types.ts";
+import { DEFAULT_LLM_PARAMS } from "./constants.ts";
 import { uniqueNumberedName, uid } from "./utils.ts";
 
 const PLACEHOLDER_IDS = new Set([
@@ -32,6 +33,24 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+function parseItems(raw: unknown): StPromptItem[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: StPromptItem[] = [];
+  for (const row of raw) {
+    const o = rec(row);
+    if (!o || typeof o.id !== "string" || typeof o.name !== "string") continue;
+    out.push({
+      id: o.id,
+      name: o.name,
+      content: str(o.content),
+      enabled: o.enabled === true,
+      place: o.place === "after" ? "after" : "before",
+      usable: o.usable !== false,
+    });
+  }
+  return out;
+}
+
 export function parseStPresets(raw: unknown): StPreset[] {
   if (!Array.isArray(raw)) return [];
   const out: StPreset[] = [];
@@ -39,6 +58,7 @@ export function parseStPresets(raw: unknown): StPreset[] {
     const o = rec(row);
     if (!o) continue;
     if (typeof o.id !== "string" || typeof o.name !== "string") continue;
+    const items = parseItems(o.items);
     out.push({
       id: o.id,
       name: o.name,
@@ -51,6 +71,7 @@ export function parseStPresets(raw: unknown): StPreset[] {
         presencePenalty: num(o.params && rec(o.params)?.presencePenalty),
         maxTokens: num(o.params && rec(o.params)?.maxTokens),
       },
+      ...(items ? { items } : {}),
     });
   }
   return out;
@@ -77,6 +98,7 @@ type PromptRow = {
   marker: boolean;
   role: string;
   injectionPosition: number;
+  enabled: boolean;
 };
 
 function readPrompt(v: unknown): PromptRow | null {
@@ -91,50 +113,76 @@ function readPrompt(v: unknown): PromptRow | null {
     marker: o.marker === true,
     role: str(o.role).toLowerCase() || "system",
     injectionPosition: num(o.injection_position) ?? 0,
+    enabled: o.enabled !== false,
   };
 }
 
-function enabledOrder(raw: Record<string, unknown>, prompts: PromptRow[]): PromptRow[] {
-  const byId = new Map(prompts.map((p) => [p.identifier, p]));
+function pickOrder(raw: Record<string, unknown>): { identifier: string; enabled: boolean }[] {
   const orders = Array.isArray(raw.prompt_order) ? raw.prompt_order : [];
-  let order: unknown[] = [];
+  let global: { identifier: string; enabled: boolean }[] | null = null;
+  let best: { identifier: string; enabled: boolean }[] = [];
   for (const entry of orders) {
     const o = rec(entry);
     if (!o || !Array.isArray(o.order)) continue;
-    if (o.character_id === 100000 || o.character_id === "100000" || !order.length) order = o.order;
-    if (o.character_id === 100000 || o.character_id === "100000") break;
+    const rows = o.order
+      .map((row) => {
+        const r = rec(row);
+        if (!r) return null;
+        const identifier = str(r.identifier);
+        if (!identifier) return null;
+        return { identifier, enabled: r.enabled !== false };
+      })
+      .filter((row): row is { identifier: string; enabled: boolean } => Boolean(row));
+    if (o.character_id === 100000 || o.character_id === "100000") global = rows;
+    if (rows.length > best.length) best = rows;
   }
-  if (!order.length) return prompts;
-  const out: PromptRow[] = [];
-  const seen = new Set<string>();
-  for (const row of order) {
-    const o = rec(row);
-    if (!o) continue;
-    if (o.enabled === false) continue;
-    const id = str(o.identifier);
-    const p = byId.get(id);
-    if (!p || seen.has(id)) continue;
-    seen.add(id);
-    out.push(p);
-  }
-  return out;
+  if (global && global.length) return global;
+  return best;
 }
 
-function isPostHistory(p: PromptRow) {
-  const id = p.identifier.toLowerCase();
-  const name = p.name.toLowerCase();
-  return (
-    id === "jailbreak" ||
-    name.includes("post-history") ||
-    name.includes("post history") ||
-    p.injectionPosition === 1
-  );
+function isHistoryMarker(p: PromptRow) {
+  return p.identifier === "chatHistory" || p.name.trim().toLowerCase() === "chat history";
 }
 
-function isPlaceholder(p: PromptRow) {
+function isSlot(p: PromptRow) {
   if (p.marker) return true;
   if (PLACEHOLDER_IDS.has(p.identifier)) return true;
   return false;
+}
+
+function isUnusable(p: PromptRow) {
+  if (isSlot(p)) return true;
+  if (p.name.includes("防截断")) return true;
+  if (p.name === "SPreset配置" || p.content.length > 20000) return true;
+  return false;
+}
+
+function isAfter(p: PromptRow, passedHistory: boolean) {
+  if (p.injectionPosition === 1) return true;
+  const id = p.identifier.toLowerCase();
+  const name = p.name.toLowerCase();
+  if (id === "jailbreak" || name.includes("post-history") || name.includes("post history")) return true;
+  return passedHistory;
+}
+
+export function presetTexts(preset: StPreset): { systemPrompt: string; postHistory: string } {
+  if (!preset.items?.length) return { systemPrompt: preset.systemPrompt, postHistory: preset.postHistory };
+  const on = preset.items.filter((item) => item.enabled && item.usable && item.content.trim());
+  return {
+    systemPrompt: on
+      .filter((item) => item.place !== "after")
+      .map((item) => item.content.trim())
+      .join("\n\n"),
+    postHistory: on
+      .filter((item) => item.place === "after")
+      .map((item) => item.content.trim())
+      .join("\n\n"),
+  };
+}
+
+export function sealPreset(preset: StPreset): StPreset {
+  const texts = presetTexts(preset);
+  return { ...preset, systemPrompt: texts.systemPrompt, postHistory: texts.postHistory };
 }
 
 export function parseChatCompletionPreset(raw: unknown, fileName: string): StPreset {
@@ -147,22 +195,42 @@ export function parseChatCompletionPreset(raw: unknown, fileName: string): StPre
   }
 
   const prompts = o.prompts.map(readPrompt).filter((p): p is PromptRow => Boolean(p));
-  const enabled = enabledOrder(o, prompts).filter((p) => !isPlaceholder(p) && p.content.trim());
+  const byId = new Map(prompts.map((p) => [p.identifier, p]));
+  const order = pickOrder(o);
+  const listed = order.length
+    ? order
+        .map((row) => {
+          const p = byId.get(row.identifier);
+          return p ? { ...p, enabled: row.enabled } : null;
+        })
+        .filter((p): p is PromptRow => Boolean(p))
+    : prompts;
 
-  const systemParts: string[] = [];
-  const postParts: string[] = [];
-  for (const p of enabled) {
-    if (isPostHistory(p)) postParts.push(p.content.trim());
-    else systemParts.push(p.content.trim());
+  let passedHistory = false;
+  const items: StPromptItem[] = [];
+  for (const p of listed) {
+    const history = isHistoryMarker(p);
+    const place = isAfter(p, passedHistory) ? "after" : "before";
+    if (history) passedHistory = true;
+    items.push({
+      id: p.identifier,
+      name: p.name,
+      content: p.content,
+      enabled: p.enabled,
+      place: history ? "before" : place,
+      usable: !isUnusable(p),
+    });
   }
-  if (!systemParts.length && !postParts.length) throw new Error("这份预设没有可导入的提示词");
+  const usable = items.some((item) => item.usable && item.content.trim());
+  if (!usable) throw new Error("这份预设没有可导入的提示词");
 
   const stem = fileName.replace(/\.json$/i, "").trim() || "未命名预设";
-  return {
+  return sealPreset({
     id: uid("st_"),
     name: stem,
-    systemPrompt: systemParts.join("\n\n"),
-    postHistory: postParts.join("\n\n"),
+    systemPrompt: "",
+    postHistory: "",
+    items,
     params: {
       temperature: num(o.temperature),
       topP: num(o.top_p) ?? num(o.topP),
@@ -170,7 +238,7 @@ export function parseChatCompletionPreset(raw: unknown, fileName: string): StPre
       presencePenalty: num(o.presence_penalty) ?? num(o.presencePenalty),
       maxTokens: num(o.openai_max_tokens) ?? num(o.max_tokens) ?? num(o.maxTokens),
     },
-  };
+  });
 }
 
 export function uniquePresetName(desired: string, existing: string[]) {
@@ -232,8 +300,9 @@ export function imagePresetStyle(
   const preset = activeImagePreset(settings);
   if (!preset) return {};
   const ctx = macroContext(chat);
-  const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-  const post = substituteMacros(preset.postHistory, ctx).trim();
+  const texts = presetTexts(preset);
+  const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+  const post = substituteMacros(texts.postHistory, ctx).trim();
   const closer =
     "上面的预设只影响怎么理解这一镜。最终输出仍只能是生图标签或规定的 JSON。思考过程不要写进标签。";
   return {
@@ -261,8 +330,9 @@ export function wechatPresetStyle(
   const preset = activeWechatPreset(settings);
   if (!preset) return {};
   const ctx = macroContext(chat);
-  const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-  const post = substituteMacros(preset.postHistory, ctx).trim();
+  const texts = presetTexts(preset);
+  const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+  const post = substituteMacros(texts.postHistory, ctx).trim();
   const closer = group
     ? "上面的预设只影响她们怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要小说，不要状态栏，不要预设自己的消息格式。bubbles 是数组，每项是 {name, text}。inner 和 sticker 按角色名分开。思考不要写进 text 或 inner。bubbles 的先后就是发出顺序。后一条已经看见前一条，不要把每个人写成同时只回用户。" +
       (inlineImage ? "JSON 结束后另起一行写 <<<PROMPT>>>，里面只许英文 tag，然后 <<<END>>>。" : "")
@@ -275,27 +345,49 @@ export function wechatPresetStyle(
   };
 }
 
-export function samplerPatch(params: StPreset["params"], current: LlmParams): LlmParams {
+function keepLocked(current: LlmParams, next: LlmParams): LlmParams {
   return {
+    ...next,
+    temperature: current.temperatureLocked ? current.temperature : next.temperature,
+    topP: current.topPLocked ? current.topP : next.topP,
+    frequencyPenalty: current.frequencyPenaltyLocked ? current.frequencyPenalty : next.frequencyPenalty,
+    presencePenalty: current.presencePenaltyLocked ? current.presencePenalty : next.presencePenalty,
+    maxTokens: current.maxTokensLocked ? current.maxTokens : next.maxTokens,
+    contextTurns: current.contextTurnsLocked ? current.contextTurns : next.contextTurns,
+    temperatureLocked: current.temperatureLocked,
+    topPLocked: current.topPLocked,
+    frequencyPenaltyLocked: current.frequencyPenaltyLocked,
+    presencePenaltyLocked: current.presencePenaltyLocked,
+    maxTokensLocked: current.maxTokensLocked,
+    contextTurnsLocked: current.contextTurnsLocked,
+  };
+}
+
+export function samplerPatch(params: StPreset["params"], current: LlmParams): LlmParams {
+  return keepLocked(current, {
     ...current,
     temperature: params.temperature ?? current.temperature,
     topP: params.topP ?? current.topP,
     frequencyPenalty: params.frequencyPenalty ?? current.frequencyPenalty,
     presencePenalty: params.presencePenalty ?? current.presencePenalty,
     maxTokens: params.maxTokens ?? current.maxTokens,
-  };
+  });
 }
 
 export function restoreSampler(snapshot: LlmParams | null, current: LlmParams): LlmParams {
   if (!snapshot) return current;
-  return {
+  return keepLocked(current, {
     ...current,
     temperature: snapshot.temperature,
     topP: snapshot.topP,
     frequencyPenalty: snapshot.frequencyPenalty,
     presencePenalty: snapshot.presencePenalty,
     maxTokens: snapshot.maxTokens,
-  };
+  });
+}
+
+export function defaultSampler(current: LlmParams): LlmParams {
+  return keepLocked(current, { ...DEFAULT_LLM_PARAMS });
 }
 
 export function presetStyle(
@@ -307,8 +399,9 @@ export function presetStyle(
   const preset = activePreset(settings);
   if (!preset) return {};
   const ctx = macroContext(chat);
-  const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-  const post = substituteMacros(preset.postHistory, ctx).trim();
+  const texts = presetTexts(preset);
+  const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+  const post = substituteMacros(texts.postHistory, ctx).trim();
   if (task === "chat") {
     return {
       styleExtra: sys || undefined,

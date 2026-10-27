@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as PE, type ReactNode } from "react";
 import { Bookmark, Check, ChevronLeft, Clock, Download, Eye, Folder, Loader2, MoreHorizontal, Pencil, ScanSearch, SlidersHorizontal, Star, X } from "lucide-react";
 import { parseNaiPng } from "@/lib/png-meta";
-import { buildNaiPayload, modelLabel, modelShort, samplerLabel, samplerShort } from "@/lib/nai";
+import { buildNaiPayload, modelLabel, modelShort, naiDrawAuth, samplerLabel, samplerShort } from "@/lib/nai";
 import { COOLDOWN_MS, NAI_MODELS, NOISE_SCHEDULES } from "@/lib/constants";
 import { imageUrl } from "@/lib/idb";
 import { fakePureChat, useApp, countFavsInGroup, favGroupDescendants } from "@/lib/store";
@@ -1464,8 +1464,9 @@ async function drawOne(
 ) {
   const params = useApp.getState().pureParams;
   const settings = useApp.getState().settings;
-  if (!settings.naiKey) {
-    useApp.getState().toast("还没连接 NAI");
+  const auth = naiDrawAuth(settings);
+  if (!auth) {
+    useApp.getState().toast("还没连接生图");
     useApp.getState().setUI({ connection: true });
     return;
   }
@@ -1481,12 +1482,13 @@ async function drawOne(
       chat: fakePureChat(params, settings.grokModelId),
       grokTail: "",
       seed,
-      apiKey: settings.naiKey,
-      baseUrl: settings.naiBase,
+      apiKey: auth.apiKey,
+      baseUrl: auth.baseUrl,
+      mode: auth.mode,
       signal: ac.signal,
       onStart: () => setPhase("generating"),
       onReceiving: () => {
-        useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+        if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
         setPhase("receiving");
       },
     });

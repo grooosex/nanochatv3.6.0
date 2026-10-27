@@ -20,6 +20,7 @@ import {
 } from "@/lib/engine";
 import { grokStream } from "@/lib/grok-client";
 import { sanitizeNaiTags, extractGrokTail, type PresenceUpdate } from "@/lib/nai-tags";
+import { naiDrawAuth } from "@/lib/nai";
 import { COOLDOWN_MS } from "@/lib/constants";
 import { useApp } from "@/lib/store";
 import { detachWechat } from "@/lib/wechat";
@@ -374,8 +375,9 @@ export async function attachImage(
       ),
     }));
 
-  if (!settings.naiKey) {
-    setImg({ status: "error", error: "还没连接 NAI 中转站" });
+  const auth = naiDrawAuth(settings);
+  if (!auth) {
+    setImg({ status: "error", error: "还没连接生图" });
     return;
   }
 
@@ -432,13 +434,14 @@ export async function attachImage(
       grokTail,
       charTails,
       seed: img.seed,
-      apiKey: settings.naiKey,
-      baseUrl: settings.naiBase,
+      apiKey: auth.apiKey,
+      baseUrl: auth.baseUrl,
+      mode: auth.mode,
       turnImageBlobId: turnI2iBlob(live, msgId),
       signal: ac.signal,
       onStart: () => setImg({ status: "generating" }),
       onReceiving: () => {
-        useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+        if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
         setImg({ status: "receiving" });
       },
     });

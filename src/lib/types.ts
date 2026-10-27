@@ -326,6 +326,12 @@ export interface LlmParams {
   presencePenalty: number;
   maxTokens: number;
   contextTurns: number;
+  temperatureLocked?: boolean;
+  topPLocked?: boolean;
+  frequencyPenaltyLocked?: boolean;
+  presencePenaltyLocked?: boolean;
+  maxTokensLocked?: boolean;
+  contextTurnsLocked?: boolean;
 }
 
 export interface LlmAccount {
@@ -345,12 +351,24 @@ export interface StPresetParams {
   maxTokens?: number;
 }
 
+export interface StPromptItem {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  /** before：聊天记录前面。after：聊天记录后面。 */
+  place: "before" | "after";
+  /** 空位、工具调用这类绘语用不上的，只展示。 */
+  usable: boolean;
+}
+
 export interface StPreset {
   id: string;
   name: string;
   systemPrompt: string;
   postHistory: string;
   params: StPresetParams;
+  items?: StPromptItem[];
 }
 
 export interface Settings {
@@ -373,9 +391,18 @@ export interface Settings {
   stImageActiveId: string | null;
   /** 写微信回复时用的预设。不改温度，也不改微信的 JSON 格式。未选则和以前一样。 */
   stWechatActiveId: string | null;
+  /** 三处共用的那一份。开关决定用在哪。 */
+  stPresetId?: string | null;
+  stUseChat?: boolean;
+  stUseImage?: boolean;
+  stUseWechat?: boolean;
   naiKey: string;
   naiBase: string;
   naiConnected: boolean;
+  /** 当前生图走中转站还是官网。两边密钥都留着，只有一边算已连接。 */
+  naiImageSource?: "proxy" | "official";
+  naiOfficialKey?: string;
+  naiOfficialConnected?: boolean;
   cooldownUntil: number;
   chatImage: boolean;
   /** null/unset = 与聊天一致. Global, not per-chat. */

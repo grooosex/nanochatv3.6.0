@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseChatCompletionPreset, substituteMacros, uniquePresetName, imagePresetStyle } from "./st-preset.ts";
+import { parseChatCompletionPreset, substituteMacros, uniquePresetName, imagePresetStyle, defaultSampler } from "./st-preset.ts";
 import { systemFor, RP_SYSTEM, POLISH_SYSTEM, FIELD_SYSTEM } from "./prompts.ts";
 
 const sample = {
@@ -65,6 +65,59 @@ describe("st chat completion preset", () => {
     assert.equal(p.params.presencePenalty, 0.85);
     assert.equal(p.params.maxTokens, 32000);
     assert.equal((p.params as { contextTurns?: number }).contextTurns, undefined);
+  });
+
+  it("uses the filled prompt order when the global one is empty, and skips closed switches", () => {
+    const p = parseChatCompletionPreset(
+      {
+        prompts: [
+          { identifier: "a", name: "开着", content: "要发", enabled: true },
+          { identifier: "chatHistory", name: "Chat History", marker: true, content: "" },
+          { identifier: "b", name: "文风", content: "文风正文", enabled: true },
+          { identifier: "c", name: "关掉", content: "不要发", enabled: false },
+          { identifier: "d", name: "防截断2.0", content: "调用工具", enabled: true },
+          { identifier: "junk", name: "废稿", content: "不在表里", enabled: true },
+        ],
+        prompt_order: [
+          { character_id: 100000, order: [] },
+          {
+            character_id: 100001,
+            order: [
+              { identifier: "a", enabled: true },
+              { identifier: "chatHistory", enabled: true },
+              { identifier: "b", enabled: true },
+              { identifier: "c", enabled: false },
+              { identifier: "d", enabled: true },
+            ],
+          },
+        ],
+      },
+      "Reborn.json",
+    );
+    assert.equal(p.systemPrompt, "要发");
+    assert.equal(p.postHistory, "文风正文");
+    assert.equal(p.systemPrompt.includes("不要发"), false);
+    assert.equal(p.systemPrompt.includes("不在表里"), false);
+    assert.equal(p.postHistory.includes("调用工具"), false);
+    assert.equal(p.items?.find((item) => item.name === "关掉")?.enabled, false);
+    assert.equal(p.items?.find((item) => item.name === "防截断2.0")?.usable, false);
+  });
+
+  it("restoring default sampler leaves locked numbers alone", () => {
+    const next = defaultSampler({
+      temperature: 1.5,
+      topP: 0.2,
+      frequencyPenalty: 1,
+      presencePenalty: 1,
+      maxTokens: 8000,
+      contextTurns: 40,
+      temperatureLocked: true,
+    });
+    assert.equal(next.temperature, 1.5);
+    assert.equal(next.topP, 1);
+    assert.equal(next.maxTokens, 4096);
+    assert.equal(next.contextTurns, 16);
+    assert.equal(next.temperatureLocked, true);
   });
 
   it("rejects text completion and character cards", () => {

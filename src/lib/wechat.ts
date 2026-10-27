@@ -1,6 +1,7 @@
 import { COOLDOWN_MS } from "./constants.ts";
 import { afterPaint, generateNai, imageFailText, makeImageRecord, parseImageTagOutput, writeImageTags } from "./engine.ts";
 import { grokOnce } from "./grok-client.ts";
+import { naiDrawAuth } from "./nai.ts";
 import { sanitizeNaiTags, type PresenceUpdate } from "./nai-tags.ts";
 import { replyContextText } from "./reply-markup.ts";
 import { blobDataUrl } from "./ref-image.ts";
@@ -1328,7 +1329,8 @@ export async function paintWechat(
   imageStops.set(key, ac);
   try {
     const settings = useApp.getState().settings;
-    if (!settings.naiKey) throw new Error("还没连接 NAI 中转站");
+    const auth = naiDrawAuth(settings);
+    if (!auth) throw new Error("还没连接生图");
     let grokTail = custom ? sanitizeNaiTags(custom, { stripForbidden: false }) : "";
     let charTails: Record<string, string> = {};
     if (customChars) {
@@ -1426,12 +1428,13 @@ export async function paintWechat(
       grokTail,
       charTails,
       seed: record.seed,
-      apiKey: settings.naiKey,
-      baseUrl: settings.naiBase,
+      apiKey: auth.apiKey,
+      baseUrl: auth.baseUrl,
+      mode: auth.mode,
       signal: ac.signal,
       onStart: () => setImg({ status: "generating" }),
       onReceiving: () => {
-        useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+        if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
         setImg({ status: "receiving" });
       },
     });

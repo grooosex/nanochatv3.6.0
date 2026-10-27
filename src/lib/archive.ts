@@ -221,6 +221,7 @@ export async function importArchive(file: File) {
       ...((prevVal as object) ?? {}),
       ...dumpS,
       naiKey: dumpS?.naiKey || prevVal?.naiKey || "",
+      naiOfficialKey: dumpS?.naiOfficialKey || prevVal?.naiOfficialKey || "",
       llmKey: dumpS?.llmKey || prevVal?.llmKey || "",
       llmAccounts: Array.isArray(dumpS?.llmAccounts) ? dumpS.llmAccounts : (prevVal?.llmAccounts ?? []),
       stPresets: Array.isArray(dumpS?.stPresets) ? dumpS.stPresets : (prevVal?.stPresets ?? []),

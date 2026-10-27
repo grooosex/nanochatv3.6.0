@@ -427,8 +427,8 @@ function isHopTimeout(e: unknown) {
   return e instanceof Error && e.name === "HopTimeout";
 }
 
-async function naiHop(body: Record<string, unknown>, signal?: AbortSignal): Promise<NaiHop> {
-  const hop = AbortSignal.timeout(NAI_HOP_TIMEOUT_MS);
+async function naiHop(body: Record<string, unknown>, signal?: AbortSignal, timeoutMs = NAI_HOP_TIMEOUT_MS): Promise<NaiHop> {
+  const hop = AbortSignal.timeout(timeoutMs);
   const combined = signal ? AbortSignal.any([signal, hop]) : hop;
   let res: Response;
   try {
@@ -442,7 +442,7 @@ async function naiHop(body: Record<string, unknown>, signal?: AbortSignal): Prom
     if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const name = e instanceof Error || e instanceof DOMException ? e.name : "";
     if (name === "AbortError" || name === "TimeoutError") {
-      const err = new Error("中转站超时，请稍后重试");
+      const err = new Error(body.action === "official" ? "官网生图超时" : "中转站超时，请稍后重试");
       err.name = "HopTimeout";
       throw err;
     }
@@ -475,6 +475,7 @@ export async function generateNai(opts: {
   seed?: number;
   apiKey: string;
   baseUrl: string;
+  mode?: "proxy" | "official";
   turnImageBlobId?: string;
   onStart?: () => void;
   onReceiving?: () => void;
@@ -508,6 +509,27 @@ export async function generateNai(opts: {
     return { blobId: saved.blobId, seed: built.seed, prompt: built.finalPrompt, blob: saved.blob };
   };
   const base = { baseUrl: opts.baseUrl, apiKey: opts.apiKey };
+  if (opts.mode === "official") {
+    const parameters = { ...built.parameters };
+    let action = "generate";
+    if (img2img) {
+      action = "img2img";
+      parameters.image = img2img.image;
+      parameters.strength = img2img.strength;
+      parameters.noise = img2img.noise;
+    }
+    const hop = await naiHop(
+      {
+        action: "official",
+        apiKey: opts.apiKey,
+        payload: { input: built.input, model: built.model, action, parameters },
+      },
+      opts.signal,
+      100000,
+    );
+    if (!hop.image) throw new Error("官网没有返回图片");
+    return finish(hop.image);
+  }
   const started = Date.now();
   const timedOut = () => Date.now() - started >= IMAGE_DRAW_TIMEOUT_MS;
   let submit: NaiHop | undefined;

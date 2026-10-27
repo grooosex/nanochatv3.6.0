@@ -1,88 +1,52 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Download, FileUp, Settings, Star, Trash2, Upload, X } from "lucide-react";
-import { DEFAULT_LLM_PARAMS, DEFAULT_NAI_BASE, shortModelLabel } from "@/lib/constants";
+import { Check, ChevronDown, Download, FileUp, Lock, Pencil, Settings, Star, Trash2, Upload, X } from "lucide-react";
+import { DEFAULT_NAI_BASE, shortModelLabel } from "@/lib/constants";
 import { exportArchive, importArchive } from "@/lib/archive";
 import { fetchLlmModels } from "@/lib/grok-client";
 import { applyLlmPick, pruneStarred, snapshotLlmAccount } from "@/lib/llm-models";
 import { llmIdentity } from "@/lib/image-ai";
 import { useApp } from "@/lib/store";
 import { cn, uid, uniqueNumberedName } from "@/lib/utils";
-import type { LlmAccount, StPreset } from "@/lib/types";
+import type { LlmAccount, LlmParams, StPreset, StPromptItem } from "@/lib/types";
 import {
-  activePreset,
+  defaultSampler,
   parseChatCompletionPreset,
   restoreSampler,
   samplerPatch,
+  sealPreset,
   uniquePresetName,
 } from "@/lib/st-preset";
-import { GhostBtn, Modal, PrimaryBtn, Slider, Switch, TextInput } from "./ui-kit";
+import { GhostBtn, Modal, PrimaryBtn, Slider, Switch, TextArea, TextInput } from "./ui-kit";
+import { NAI_OFFICIAL_BASE } from "@/lib/nai";
 
 export function ConnectionPanel() {
   const open = useApp((s) => s.ui.connection);
   const settings = useApp((s) => s.settings);
   const setUI = useApp((s) => s.setUI);
-  const [key, setKey] = useState(settings.naiKey);
-  const [base, setBase] = useState(settings.naiBase || DEFAULT_NAI_BASE);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
   const [dl, setDl] = useState(false);
-  const [apiOpen, setApiOpen] = useState(false);
+  const [page, setPage] = useState<null | "chat" | "image" | "preset">(null);
   const llmSettings = useApp((s) => s.ui.llmSettings);
   useEffect(() => {
     if (!open || !llmSettings) return;
-    setApiOpen(true);
+    setPage("chat");
     useApp.getState().setUI({ llmSettings: false });
   }, [open, llmSettings]);
   useEffect(() => {
-    if (!open) setApiOpen(false);
+    if (!open) setPage(null);
   }, [open]);
   if (!open) return null;
 
   const close = () => {
-    setApiOpen(false);
+    setPage(null);
     setUI({ connection: false });
-  };
-
-  const save = async () => {
-    setBusy(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/nai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "test", baseUrl: base, apiKey: key }),
-      });
-      const data = (await res.json()) as { ok: boolean; error?: string };
-      if (!data.ok) {
-        setErr(data.error || "连接失败");
-        useApp.getState().setSettings({ naiKey: key, naiBase: base, naiConnected: false });
-        return;
-      }
-      useApp.getState().setSettings({ naiKey: key, naiBase: base, naiConnected: true });
-      useApp.getState().toast("已连接");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "连接失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const selectGrok = () => useApp.getState().setSettings({ chatSource: "grok" });
-  const selectApi = () => {
-    if (!settings.llmConnected) {
-      useApp.getState().toast("先连接 API");
-      setApiOpen(true);
-      return;
-    }
-    useApp.getState().setSettings({ chatSource: "api" });
   };
 
   return (
     <div className="absolute inset-0 z-50 flex justify-center px-4 py-8">
       <div className="absolute inset-0 bg-overlay/40" />
       <SheetCard
-        title="连接"
+        title="设置"
         titleExtra={
           <span className="flex items-center gap-1.5 text-[13px] text-muted">
             <Switch
@@ -129,88 +93,9 @@ export function ConnectionPanel() {
           </label>
         </div>
 
-        <button
-          type="button"
-          onClick={selectGrok}
-          className={cn(
-            "mb-3 w-full rounded-[18px] border p-4 text-left",
-            settings.chatSource === "grok" ? "border-primary bg-primary-soft" : "border-line bg-card",
-          )}
-        >
-          <div className="mb-1 font-medium">Grok</div>
-          <p className="text-[12px] leading-relaxed text-muted">
-            已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.7 / 4.6 / 4.5 均衡、专家、快速。
-          </p>
-        </button>
-
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={selectApi}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") selectApi();
-          }}
-          className={cn(
-            "mb-4 flex w-full items-center gap-3 rounded-[18px] border p-4 text-left",
-            settings.chatSource === "api" ? "border-primary bg-primary-soft" : "border-line bg-card",
-          )}
-        >
-          <div className="min-w-0 flex-1">
-            <div className="font-medium">API 连接</div>
-            <p className="mt-0.5 truncate text-[12px] text-muted">
-              {settings.llmConnected
-                ? settings.llmModel
-                  ? shortModelLabel(settings.llmModel)
-                  : "已连接，去设置里选模型"
-                : "未连接。点齿轮填写网址和密钥"}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {settings.llmConnected ? (
-              <Check className="size-5 text-good" />
-            ) : (
-              <X className="size-5 text-danger" />
-            )}
-            <button
-              type="button"
-              className="grid size-9 place-items-center rounded-full hover:bg-dim"
-              onClick={() => setApiOpen(true)}
-              aria-label="API 设置"
-            >
-              <Settings className="size-5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[14px] font-medium">NAI 中转站 API Key</div>
-          {settings.naiConnected ? (
-            <span className="flex items-center gap-2 text-[12px]">
-              <span className="flex items-center gap-1 text-good">
-                <Check className="size-3.5" /> 已连接
-              </span>
-              <button
-                className="text-muted"
-                onClick={() => {
-                  useApp.getState().setSettings({ naiConnected: false, naiKey: "" });
-                  setKey("");
-                }}
-              >
-                退出
-              </button>
-            </span>
-          ) : null}
-        </div>
-        <TextInput type="password" value={key} placeholder="" onChange={(e) => setKey(e.target.value)} />
-        <p className="mb-3 mt-1 text-[11px] text-muted">
-          进阶档位以上可生成 Key。Key 只保存在你这台设备上。点保存后即可聊天配图和纯生图。
-        </p>
-        <div className="mb-1 text-[14px] font-medium">中转站地址</div>
-        <TextInput value={base} onChange={(e) => setBase(e.target.value)} />
-        {err && <p className="mt-2 text-[12px] text-danger">{err}</p>}
-        <PrimaryBtn className="mt-4" busy={busy} onClick={() => void save()}>
-          保存
-        </PrimaryBtn>
+        <GearRow label="聊天补全 AI" onClick={() => setPage("chat")} />
+        <GearRow label="生图 AI" onClick={() => setPage("image")} />
+        <GearRow label="预设设置" onClick={() => setPage("preset")} />
       </SheetCard>
       <Modal open={dl} onClose={() => setDl(false)} title="下载存档">
         <p className="mb-4 text-[13px] text-muted">全部含配图。部分配图留下你上传的头像、表情包、收藏和照片，不含生成图。无配图可再次点重生。</p>
@@ -241,10 +126,12 @@ export function ConnectionPanel() {
           </GhostBtn>
         </div>
       </Modal>
-      {apiOpen && (
+      {page && (
         <div className="absolute inset-0 z-20 flex justify-center px-4 py-8">
-          <button type="button" className="absolute inset-0 bg-overlay/40" onClick={() => setApiOpen(false)} aria-label="关闭" />
-          <ApiSettingsSheet onClose={() => setApiOpen(false)} />
+          <button type="button" className="absolute inset-0 bg-overlay/40" onClick={() => setPage(null)} aria-label="返回" />
+          {page === "chat" && <ChatAiSheet onClose={() => setPage(null)} />}
+          {page === "image" && <ImageAiSheet onClose={() => setPage(null)} />}
+          {page === "preset" && <PresetSheet onClose={() => setPage(null)} />}
         </div>
       )}
     </div>
@@ -276,7 +163,20 @@ function SheetCard({
   );
 }
 
-function ApiSettingsSheet({ onClose }: { onClose: () => void }) {
+function GearRow({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-3 flex w-full items-center justify-between rounded-[18px] border border-line bg-card px-4 py-4 text-left active:bg-dim"
+    >
+      <span className="text-[15px]">{label}</span>
+      <Settings className="size-5 text-muted" />
+    </button>
+  );
+}
+
+function ChatAiSheet({ onClose }: { onClose: () => void }) {
   const settings = useApp((s) => s.settings);
   const [url, setUrl] = useState(settings.llmBase);
   const [key, setKey] = useState(settings.llmKey);
@@ -285,6 +185,7 @@ function ApiSettingsSheet({ onClose }: { onClose: () => void }) {
   const [err, setErr] = useState("");
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
+  const [showApi, setShowApi] = useState(settings.chatSource === "api");
 
   useEffect(() => {
     setUrl(settings.llmBase);
@@ -372,10 +273,49 @@ function ApiSettingsSheet({ onClose }: { onClose: () => void }) {
     setSaveName("");
   };
 
-  const p = settings.llmParams;
-
   return (
-    <SheetCard title="API 设置" onClose={onClose}>
+    <SheetCard title="聊天补全 AI" onClose={onClose}>
+      <button
+        type="button"
+        onClick={() => {
+          setShowApi(false);
+          useApp.getState().setSettings({ chatSource: "grok" });
+        }}
+        className={cn(
+          "mb-3 w-full rounded-[18px] border p-4 text-left",
+          settings.chatSource === "grok" ? "border-primary bg-primary-soft" : "border-line bg-card",
+        )}
+      >
+        <div className="mb-1 font-medium">Grok</div>
+        <p className="text-[12px] leading-relaxed text-muted">
+          已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.7 / 4.6 / 4.5 均衡、专家、快速。
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setShowApi(true);
+          if (settings.llmConnected) useApp.getState().setSettings({ chatSource: "api" });
+        }}
+        className={cn(
+          "mb-4 flex w-full items-center gap-3 rounded-[18px] border p-4 text-left",
+          showApi || settings.chatSource === "api" ? "border-primary bg-primary-soft" : "border-line bg-card",
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="font-medium">API 连接</div>
+          <p className="mt-0.5 truncate text-[12px] text-muted">
+            {settings.llmConnected
+              ? settings.llmModel
+                ? shortModelLabel(settings.llmModel)
+                : "已连接"
+              : "未连接"}
+          </p>
+        </div>
+        {settings.llmConnected && settings.chatSource === "api" ? <Check className="size-5 shrink-0 text-good" /> : null}
+      </button>
+      {showApi ? (
+        <>
       <div className="mb-1 flex items-center justify-between text-[14px] font-medium">
         <span>网址</span>
         <button
@@ -496,74 +436,8 @@ function ApiSettingsSheet({ onClose }: { onClose: () => void }) {
         当前：{settings.llmModel ? shortModelLabel(settings.llmModel) : "未选"} · 常用{" "}
         {pruneStarred(settings.llmStarred, settings.llmModels, settings.llmModel).length}
       </p>
-
-      <ChatPresetPicker mode="chat" />
-      <ChatPresetPicker mode="image" />
-      <ChatPresetPicker mode="wechat" />
-
-      <div className="mt-5 mb-2 flex items-center justify-between">
-        <div className="text-[14px] font-medium">预设</div>
-        <button
-          type="button"
-          className="text-[12px] text-muted"
-          onClick={() => useApp.getState().setSettings({ llmParams: { ...DEFAULT_LLM_PARAMS } })}
-        >
-          恢复默认
-        </button>
-      </div>
-      {activePreset(settings) && (
-        <p className="mb-2 text-[11px] text-muted">采样来自：{activePreset(settings)?.name}</p>
-      )}
-      <ParamRow
-        label="温度"
-        value={p.temperature}
-        min={0}
-        max={2}
-        step={0.05}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, temperature: n } })}
-      />
-      <ParamRow
-        label="Top P"
-        value={p.topP}
-        min={0}
-        max={1}
-        step={0.05}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, topP: n } })}
-      />
-      <ParamRow
-        label="频率惩罚"
-        value={p.frequencyPenalty}
-        min={0}
-        max={2}
-        step={0.05}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, frequencyPenalty: n } })}
-      />
-      <ParamRow
-        label="存在惩罚"
-        value={p.presencePenalty}
-        min={0}
-        max={2}
-        step={0.05}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, presencePenalty: n } })}
-      />
-      <ParamRow
-        label="最大回复"
-        value={p.maxTokens}
-        min={256}
-        max={32000}
-        step={256}
-        digits={0}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, maxTokens: n } })}
-      />
-      <ParamRow
-        label="上下文（轮）"
-        value={p.contextTurns}
-        min={4}
-        max={40}
-        step={1}
-        digits={0}
-        onChange={(n) => useApp.getState().setSettings({ llmParams: { ...p, contextTurns: n } })}
-      />
+        </>
+      ) : null}
       <Modal open={saveOpen} onClose={() => setSaveOpen(false)} title="保存账号">
         <TextInput
           value={saveName}
@@ -581,75 +455,98 @@ function ApiSettingsSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
+function presetUses(s: { stUseChat?: boolean; stUseImage?: boolean; stUseWechat?: boolean }) {
+  return { chat: Boolean(s.stUseChat), image: Boolean(s.stUseImage), wechat: Boolean(s.stUseWechat) };
+}
+
+function writePresetUse(
+  id: string | null,
+  use: { chat: boolean; image: boolean; wechat: boolean },
+  extra?: { llmParams?: ReturnType<typeof samplerPatch>; stParamSnapshot?: ReturnType<typeof samplerPatch> | null },
+) {
+  useApp.getState().setSettings({
+    stPresetId: id,
+    stUseChat: use.chat,
+    stUseImage: use.image,
+    stUseWechat: use.wechat,
+    stActiveId: use.chat ? id : null,
+    stImageActiveId: use.image ? id : null,
+    stWechatActiveId: use.wechat ? id : null,
+    ...extra,
+  });
+}
+
 function applyStPreset(preset: StPreset) {
   const s = useApp.getState().settings;
-  const snapshot = s.stParamSnapshot ?? { ...s.llmParams };
-  useApp.getState().setSettings({
-    stActiveId: preset.id,
-    stParamSnapshot: snapshot,
+  const use = presetUses(s);
+  const none = !use.chat && !use.image && !use.wechat;
+  writePresetUse(preset.id, none ? { chat: true, image: false, wechat: false } : use, {
+    stParamSnapshot: s.stParamSnapshot ?? { ...s.llmParams },
     llmParams: samplerPatch(preset.params, s.llmParams),
   });
   useApp.getState().toast(`已应用预设（${preset.name}）`);
 }
 
-function applyImagePreset(preset: StPreset) {
-  useApp.getState().setSettings({ stImageActiveId: preset.id });
-  useApp.getState().toast(`已应用生图预设（${preset.name}）`);
-}
-
-function cancelImagePreset() {
-  useApp.getState().setSettings({ stImageActiveId: null });
-  useApp.getState().toast("已取消生图预设");
-}
-
 function cancelStPreset() {
   const s = useApp.getState().settings;
-  useApp.getState().setSettings({
-    stActiveId: null,
+  writePresetUse(s.stPresetId ?? null, { chat: false, image: false, wechat: false }, {
     stParamSnapshot: null,
     llmParams: restoreSampler(s.stParamSnapshot, s.llmParams),
   });
   useApp.getState().toast("已取消预设");
 }
 
-function applyWechatPreset(preset: StPreset) {
-  useApp.getState().setSettings({ stWechatActiveId: preset.id });
-  useApp.getState().toast(`已应用微信预设（${preset.name}）`);
-}
-
-function cancelWechatPreset() {
-  useApp.getState().setSettings({ stWechatActiveId: null });
-  useApp.getState().toast("已取消微信预设");
+function setPresetUse(part: "chat" | "image" | "wechat", on: boolean) {
+  const s = useApp.getState().settings;
+  const id = s.stPresetId ?? null;
+  if (on && !id) {
+    useApp.getState().toast("先选择一份预设");
+    return;
+  }
+  const use = presetUses(s);
+  use[part] = on;
+  const anyBefore = Boolean(s.stUseChat || s.stUseImage || s.stUseWechat);
+  const any = use.chat || use.image || use.wechat;
+  const preset = (s.stPresets ?? []).find((p) => p.id === id);
+  if (on && !anyBefore && preset) {
+    writePresetUse(id, use, {
+      stParamSnapshot: s.stParamSnapshot ?? { ...s.llmParams },
+      llmParams: samplerPatch(preset.params, s.llmParams),
+    });
+    return;
+  }
+  if (!any) {
+    writePresetUse(id, use, {
+      stParamSnapshot: null,
+      llmParams: restoreSampler(s.stParamSnapshot, s.llmParams),
+    });
+    return;
+  }
+  writePresetUse(id, use);
 }
 
 function deleteStPreset(id: string) {
   const s = useApp.getState().settings;
   const next = (s.stPresets ?? []).filter((x) => x.id !== id);
-  const chatWas = s.stActiveId === id;
-  const imageWas = s.stImageActiveId === id;
-  const wechatWas = s.stWechatActiveId === id;
-  useApp.getState().setSettings({
-    stPresets: next,
-    ...(chatWas
-      ? {
-          stActiveId: null,
-          stParamSnapshot: null,
-          llmParams: restoreSampler(s.stParamSnapshot, s.llmParams),
-        }
-      : {}),
-    ...(imageWas ? { stImageActiveId: null } : {}),
-    ...(wechatWas ? { stWechatActiveId: null } : {}),
+  const was = s.stPresetId === id || s.stActiveId === id || s.stImageActiveId === id || s.stWechatActiveId === id;
+  if (!was) {
+    useApp.getState().setSettings({ stPresets: next });
+    return;
+  }
+  writePresetUse(null, { chat: false, image: false, wechat: false }, {
+    stParamSnapshot: null,
+    llmParams: restoreSampler(s.stParamSnapshot, s.llmParams),
   });
-  if (chatWas) useApp.getState().toast("已取消预设");
-  else if (imageWas) useApp.getState().toast("已取消生图预设");
-  else if (wechatWas) useApp.getState().toast("已取消微信预设");
+  useApp.getState().setSettings({ stPresets: next });
+  useApp.getState().toast("已取消预设");
 }
 
-function ChatPresetPicker({ mode }: { mode: "chat" | "image" | "wechat" }) {
+function ChatPresetPicker() {
   const settings = useApp((s) => s.settings);
   const presets = settings.stPresets ?? [];
-  const activeId = mode === "chat" ? settings.stActiveId : mode === "image" ? settings.stImageActiveId : settings.stWechatActiveId;
+  const activeId = settings.stPresetId ?? null;
   const active = presets.find((p) => p.id === activeId) ?? null;
+  const applied = Boolean(active && (settings.stUseChat || settings.stUseImage || settings.stUseWechat));
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number; maxH: number } | null>(null);
@@ -732,45 +629,35 @@ function ChatPresetPicker({ mode }: { mode: "chat" | "image" | "wechat" }) {
   };
 
   return (
-    <div className="mt-5">
+    <div>
       <div className="mb-2 flex items-center gap-2">
-        <div className="min-w-0 flex-1 text-[14px] font-medium">
-          {mode === "chat" ? "对话补全预设" : mode === "image" ? "生图提示词预设" : "微信补全预设"}
-        </div>
-        {mode === "chat" ? (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".json,application/json"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) void importFile(f);
-              }}
-            />
-            <button
-              type="button"
-              className="grid size-8 shrink-0 place-items-center text-muted"
-              aria-label="导入预设"
-              onClick={() => fileRef.current?.click()}
-            >
-              <FileUp className="size-4" />
-            </button>
-          </>
-        ) : null}
-        {active ? (
+        <div className="min-w-0 flex-1 text-[14px] font-medium">预设版本</div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void importFile(f);
+          }}
+        />
+        <button
+          type="button"
+          className="grid size-8 shrink-0 place-items-center text-muted"
+          aria-label="导入预设"
+          onClick={() => fileRef.current?.click()}
+        >
+          <FileUp className="size-4" />
+        </button>
+        {applied ? (
           <span className="flex shrink-0 items-center gap-2 text-[12px]">
             <span className="inline-flex items-center gap-1 text-good">
               <Check className="size-3.5" />
               已应用
             </span>
-            <button
-              type="button"
-              className="text-muted"
-              onClick={mode === "chat" ? cancelStPreset : mode === "image" ? cancelImagePreset : cancelWechatPreset}
-            >
+            <button type="button" className="text-muted" onClick={cancelStPreset}>
               取消
             </button>
           </span>
@@ -788,7 +675,7 @@ function ChatPresetPicker({ mode }: { mode: "chat" | "image" | "wechat" }) {
             className="min-w-0 flex-1 truncate text-left text-[13px]"
             onClick={() => (open ? setOpen(false) : openMenu())}
           >
-            <span className={active ? "text-ink" : "text-muted"}>{active ? active.name : "未应用"}</span>
+            <span className={active ? "text-ink" : "text-muted"}>{active ? active.name : "未选择"}</span>
           </button>
           <button
             type="button"
@@ -820,9 +707,7 @@ function ChatPresetPicker({ mode }: { mode: "chat" | "image" | "wechat" }) {
                           p.id === active?.id && "text-primary",
                         )}
                         onClick={() => {
-                          if (mode === "chat") applyStPreset(p);
-                          else if (mode === "image") applyImagePreset(p);
-                          else applyWechatPreset(p);
+                          applyStPreset(p);
                           setOpen(false);
                         }}
                       >
@@ -845,6 +730,416 @@ function ChatPresetPicker({ mode }: { mode: "chat" | "image" | "wechat" }) {
           )}
       </div>
     </div>
+  );
+}
+
+async function naiProbe(body: Record<string, unknown>) {
+  let j: { ok?: boolean; error?: string };
+  try {
+    const r = await fetch("/api/nai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    j = (await r.json()) as { ok?: boolean; error?: string };
+  } catch {
+    throw new Error("无法连接");
+  }
+  if (!j.ok) throw new Error(j.error || "连接失败");
+}
+
+function ImageAiSheet({ onClose }: { onClose: () => void }) {
+  const settings = useApp((s) => s.settings);
+  const source = settings.naiImageSource === "official" ? "official" : "proxy";
+  const [tab, setTab] = useState<"proxy" | "official">(source);
+  const [base, setBase] = useState(settings.naiBase || DEFAULT_NAI_BASE);
+  const [key, setKey] = useState(settings.naiKey);
+  const [officialKey, setOfficialKey] = useState(settings.naiOfficialKey ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    setBase(settings.naiBase || DEFAULT_NAI_BASE);
+    setKey(settings.naiKey);
+    setOfficialKey(settings.naiOfficialKey ?? "");
+  }, [settings.naiBase, settings.naiKey, settings.naiOfficialKey]);
+
+  const connectProxy = async () => {
+    const b = base.trim() || DEFAULT_NAI_BASE;
+    const k = key.trim();
+    if (!k) {
+      useApp.getState().toast("请填写中转站密钥");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await naiProbe({ action: "test", baseUrl: b, apiKey: k });
+      useApp.getState().setSettings({
+        naiBase: b,
+        naiKey: k,
+        naiConnected: true,
+        naiOfficialConnected: false,
+        naiImageSource: "proxy",
+      });
+      useApp.getState().toast("已连接中转站");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "连接失败";
+      setErr(msg);
+      useApp.getState().setSettings({ naiBase: b, naiKey: k, naiConnected: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectOfficial = async () => {
+    const k = officialKey.trim().replace(/^Bearer\s+/i, "");
+    if (!k) {
+      useApp.getState().toast("请填写 Persistent Token");
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await naiProbe({ action: "official-test", apiKey: k });
+      useApp.getState().setSettings({
+        naiOfficialKey: k,
+        naiOfficialConnected: true,
+        naiConnected: false,
+        naiImageSource: "official",
+      });
+      setOfficialKey(k);
+      useApp.getState().toast("已连接官网");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "连接失败";
+      setErr(msg);
+      useApp.getState().setSettings({ naiOfficialKey: k, naiOfficialConnected: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const proxyOn = Boolean(settings.naiConnected && tab === "proxy" && source === "proxy");
+  const officialOn = Boolean(settings.naiOfficialConnected && tab === "official" && source === "official");
+  const liveOther = tab !== source && (source === "official" ? settings.naiOfficialConnected : settings.naiConnected);
+
+  return (
+    <SheetCard title="生图 AI" onClose={onClose}>
+      <div className="mb-4 flex rounded-full bg-dim p-1 text-[13px]">
+        <button
+          type="button"
+          className={cn("flex-1 rounded-full py-2", tab === "proxy" && "bg-card")}
+          onClick={() => {
+            setErr("");
+            setTab("proxy");
+          }}
+        >
+          中转站
+        </button>
+        <button
+          type="button"
+          className={cn("flex-1 rounded-full py-2", tab === "official" && "bg-card")}
+          onClick={() => {
+            setErr("");
+            setTab("official");
+          }}
+        >
+          官网 API
+        </button>
+      </div>
+      {tab === "proxy" ? (
+        <>
+          <div className="mb-1 text-[14px] font-medium">中转站地址</div>
+          <TextInput
+            value={base}
+            placeholder={DEFAULT_NAI_BASE}
+            onChange={(e) => {
+              const v = e.target.value;
+              setBase(v);
+              const s = useApp.getState().settings;
+              useApp.getState().setSettings({
+                naiBase: v,
+                naiConnected: Boolean(s.naiConnected && v === s.naiBase),
+              });
+            }}
+          />
+          <div className="mb-1 mt-3 text-[14px] font-medium">中转站 API Key</div>
+          <TextInput
+            type="password"
+            value={key}
+            onChange={(e) => {
+              const v = e.target.value;
+              setKey(v);
+              const s = useApp.getState().settings;
+              useApp.getState().setSettings({
+                naiKey: v,
+                naiConnected: Boolean(s.naiConnected && v === s.naiKey),
+              });
+            }}
+          />
+          <div className="mt-3 flex h-5 justify-end">
+            {settings.naiConnected ? (
+              <button
+                type="button"
+                className="text-[12px] text-muted"
+                onClick={() => {
+                  useApp.getState().setSettings({ naiConnected: false });
+                  useApp.getState().toast("已退出中转站");
+                }}
+              >
+                退出
+              </button>
+            ) : null}
+          </div>
+          {err ? <p className="mb-2 text-[12px] text-danger">{err}</p> : null}
+          <PrimaryBtn className={cn(proxyOn && "bg-good hover:bg-good")} busy={busy} onClick={() => void connectProxy()}>
+            {proxyOn ? "已连接" : "连接"}
+          </PrimaryBtn>
+        </>
+      ) : (
+        <>
+          <div className="mb-1 text-[14px] font-medium">Persistent Token</div>
+          <TextInput
+            type="password"
+            value={officialKey}
+            placeholder="pst-"
+            onChange={(e) => {
+              const v = e.target.value;
+              setOfficialKey(v);
+              const s = useApp.getState().settings;
+              useApp.getState().setSettings({
+                naiOfficialKey: v,
+                naiOfficialConnected: Boolean(s.naiOfficialConnected && v === (s.naiOfficialKey ?? "")),
+              });
+            }}
+          />
+          <p className="mb-1 mt-1 text-[11px] text-muted">一般以 pst- 开头。地址固定为 {NAI_OFFICIAL_BASE}，不能改。</p>
+          <div className="mt-3 flex h-5 justify-end">
+            {settings.naiOfficialConnected ? (
+              <button
+                type="button"
+                className="text-[12px] text-muted"
+                onClick={() => {
+                  useApp.getState().setSettings({ naiOfficialConnected: false });
+                  useApp.getState().toast("已退出官网");
+                }}
+              >
+                退出
+              </button>
+            ) : null}
+          </div>
+          {err ? <p className="mb-2 text-[12px] text-danger">{err}</p> : null}
+          <PrimaryBtn
+            className={cn(officialOn && "bg-good hover:bg-good")}
+            busy={busy}
+            onClick={() => void connectOfficial()}
+          >
+            {officialOn ? "已连接" : "连接"}
+          </PrimaryBtn>
+        </>
+      )}
+      {liveOther ? (
+        <p className="mt-3 text-[12px] text-muted">
+          生图目前仍走{source === "official" ? "官网" : "中转站"}。连接这边后会改过来，另一边会断开，密钥还留在输入框里。
+        </p>
+      ) : null}
+    </SheetCard>
+  );
+}
+
+function patchActivePreset(map: (preset: StPreset) => StPreset) {
+  const s = useApp.getState().settings;
+  const id = s.stPresetId;
+  if (!id) return;
+  useApp.getState().setSettings({
+    stPresets: (s.stPresets ?? []).map((p) => (p.id === id ? map(p) : p)),
+  });
+}
+
+function PresetSheet({ onClose }: { onClose: () => void }) {
+  const settings = useApp((s) => s.settings);
+  const params = settings.llmParams;
+  const preset = (settings.stPresets ?? []).find((p) => p.id === settings.stPresetId) ?? null;
+  const [edit, setEdit] = useState<{ id: string; name: string; text: string; readOnly: boolean } | null>(null);
+
+  const patchParam = (partial: Partial<LlmParams>) => {
+    const cur = useApp.getState().settings.llmParams;
+    useApp.getState().setSettings({ llmParams: { ...cur, ...partial } });
+  };
+
+  const setItemEnabled = (item: StPromptItem, on: boolean) => {
+    if (!item.usable) return;
+    patchActivePreset((p) => {
+      if (!p.items) return p;
+      return sealPreset({
+        ...p,
+        items: p.items.map((row) => (row.id === item.id ? { ...row, enabled: on } : row)),
+      });
+    });
+  };
+
+  const saveEdit = () => {
+    if (!edit || edit.readOnly) return;
+    const text = edit.text;
+    const id = edit.id;
+    patchActivePreset((p) => {
+      if (!p.items) return p;
+      return sealPreset({
+        ...p,
+        items: p.items.map((row) => (row.id === id ? { ...row, content: text } : row)),
+      });
+    });
+    setEdit(null);
+  };
+
+  return (
+    <SheetCard title="预设设置" onClose={onClose}>
+      <ChatPresetPicker />
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        {(
+          [
+            ["chat", "对话", Boolean(settings.stUseChat)],
+            ["image", "生图", Boolean(settings.stUseImage)],
+            ["wechat", "微信", Boolean(settings.stUseWechat)],
+          ] as const
+        ).map(([part, label, on]) => (
+          <div key={part} className="flex flex-col items-center gap-1.5">
+            <span className="text-[13px]">{label}</span>
+            <Switch on={on} onChange={(v) => setPresetUse(part, v)} label={label} />
+          </div>
+        ))}
+      </div>
+      <div className="mb-2 mt-5 flex items-center justify-between">
+        <span className="text-[14px] font-medium">参数管理</span>
+        <button
+          type="button"
+          className="text-[12px] text-muted"
+          onClick={() => {
+            const cur = useApp.getState().settings.llmParams;
+            useApp.getState().setSettings({ llmParams: defaultSampler(cur) });
+          }}
+        >
+          恢复默认
+        </button>
+      </div>
+      <ParamRow
+        label="温度"
+        value={params.temperature}
+        min={0}
+        max={2}
+        step={0.01}
+        locked={params.temperatureLocked}
+        onLock={(v) => patchParam({ temperatureLocked: v })}
+        onChange={(n) => patchParam({ temperature: n })}
+      />
+      <ParamRow
+        label="Top P"
+        value={params.topP}
+        min={0}
+        max={1}
+        step={0.01}
+        locked={params.topPLocked}
+        onLock={(v) => patchParam({ topPLocked: v })}
+        onChange={(n) => patchParam({ topP: n })}
+      />
+      <ParamRow
+        label="频率惩罚"
+        value={params.frequencyPenalty}
+        min={-2}
+        max={2}
+        step={0.01}
+        locked={params.frequencyPenaltyLocked}
+        onLock={(v) => patchParam({ frequencyPenaltyLocked: v })}
+        onChange={(n) => patchParam({ frequencyPenalty: n })}
+      />
+      <ParamRow
+        label="存在惩罚"
+        value={params.presencePenalty}
+        min={-2}
+        max={2}
+        step={0.01}
+        locked={params.presencePenaltyLocked}
+        onLock={(v) => patchParam({ presencePenaltyLocked: v })}
+        onChange={(n) => patchParam({ presencePenalty: n })}
+      />
+      <ParamRow
+        label="最大长度"
+        value={params.maxTokens}
+        min={256}
+        max={131072}
+        step={1}
+        digits={0}
+        locked={params.maxTokensLocked}
+        onLock={(v) => patchParam({ maxTokensLocked: v })}
+        onChange={(n) => patchParam({ maxTokens: n })}
+      />
+      <ParamRow
+        label="上下文轮数"
+        value={params.contextTurns}
+        min={4}
+        max={80}
+        step={1}
+        digits={0}
+        locked={params.contextTurnsLocked}
+        onLock={(v) => patchParam({ contextTurnsLocked: v })}
+        onChange={(n) => patchParam({ contextTurns: n })}
+      />
+      <div className="mb-2 mt-4 text-[14px] font-medium">内容开关</div>
+      {!preset ? (
+        <p className="text-[12px] text-muted">先选择一份预设。</p>
+      ) : !preset.items?.length ? (
+        <p className="text-[12px] leading-relaxed text-muted">
+          这是以前导入的预设，只有整段文字，没有一条条开关。重新导入后才能逐条开关，现在仍按原来的整段发送。
+        </p>
+      ) : (
+        <div>
+          {preset.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 border-b border-line/70 py-2.5 last:border-0">
+              <span
+                className={cn(
+                  "min-w-0 flex-1 truncate text-[13px]",
+                  item.usable ? (item.enabled ? "font-semibold text-ink" : "text-ink") : "text-faint",
+                )}
+              >
+                {item.name}
+              </span>
+              <button
+                type="button"
+                className={cn("grid size-8 shrink-0 place-items-center", item.usable ? "text-muted" : "text-faint")}
+                aria-label={item.usable ? `编辑${item.name}` : `查看${item.name}`}
+                onClick={() => setEdit({ id: item.id, name: item.name, text: item.content, readOnly: !item.usable })}
+              >
+                <Pencil className="size-3.5" />
+              </button>
+              <Switch
+                on={Boolean(item.usable && item.enabled)}
+                disabled={!item.usable}
+                label={item.name}
+                onChange={(v) => setItemEnabled(item, v)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+      <Modal open={Boolean(edit)} onClose={() => setEdit(null)} title={edit?.name || "内容"} wide>
+        <TextArea
+          className={cn("min-h-[200px]", edit?.readOnly && "text-muted")}
+          value={edit?.text ?? ""}
+          readOnly={edit?.readOnly}
+          onChange={(e) => {
+            const text = e.target.value;
+            setEdit((cur) => (cur ? { ...cur, text } : cur));
+          }}
+        />
+        {edit?.readOnly ? (
+          <p className="mt-2 text-[12px] text-muted">这一条绘语用不上，只给查看，不会发送。</p>
+        ) : (
+          <PrimaryBtn className="mt-4" onClick={saveEdit}>
+            保存
+          </PrimaryBtn>
+        )}
+      </Modal>
+    </SheetCard>
   );
 }
 
@@ -1148,6 +1443,8 @@ function ParamRow({
   max,
   step,
   digits = 2,
+  locked,
+  onLock,
   onChange,
 }: {
   label: string;
@@ -1156,16 +1453,30 @@ function ParamRow({
   max: number;
   step: number;
   digits?: number;
+  locked?: boolean;
+  onLock?: (v: boolean) => void;
   onChange: (n: number) => void;
 }) {
   const shown = digits === 0 ? String(Math.round(value)) : value.toFixed(digits);
   return (
     <div className="mb-3">
       <div className="mb-0.5 flex items-center justify-between text-[13px]">
-        <span>{label}</span>
-        <span className="tabular-nums text-muted">{shown}</span>
+        <span className={locked ? "text-muted" : undefined}>{label}</span>
+        <span className="flex items-center gap-1.5 tabular-nums text-muted">
+          {shown}
+          {onLock ? (
+            <button
+              type="button"
+              className={locked ? "text-primary" : "text-muted"}
+              onClick={() => onLock(!locked)}
+              aria-label={locked ? "解锁" : "锁定"}
+            >
+              <Lock className="size-3.5" />
+            </button>
+          ) : null}
+        </span>
       </div>
-      <Slider value={value} min={min} max={max} step={step} onChange={onChange} />
+      <Slider value={value} min={min} max={max} step={step} onChange={onChange} disabled={locked} />
     </div>
   );
 }

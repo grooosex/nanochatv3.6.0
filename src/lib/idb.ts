@@ -31,9 +31,16 @@ export const defaultSettings = (): Settings => ({
   stParamSnapshot: null,
   stImageActiveId: null,
   stWechatActiveId: null,
+  stPresetId: null,
+  stUseChat: false,
+  stUseImage: false,
+  stUseWechat: false,
   naiKey: "",
   naiBase: DEFAULT_NAI_BASE,
   naiConnected: false,
+  naiImageSource: "proxy",
+  naiOfficialKey: "",
+  naiOfficialConnected: false,
   cooldownUntil: 0,
   chatImage: true,
   imageModelId: null,
@@ -114,7 +121,16 @@ export async function loadAll() {
     typeof raw?.stWechatActiveId === "string" && stPresets.some((p) => p.id === raw.stWechatActiveId)
       ? raw.stWechatActiveId
       : null;
-  const settings = {
+  const picked =
+    (typeof raw?.stPresetId === "string" && stPresets.some((p) => p.id === raw.stPresetId) ? raw.stPresetId : null) ||
+    stActiveId ||
+    stWechatActiveId ||
+    stImageActiveId;
+  const stUseChat = typeof raw?.stUseChat === "boolean" ? raw.stUseChat : Boolean(stActiveId);
+  const stUseImage = typeof raw?.stUseImage === "boolean" ? raw.stUseImage : Boolean(stImageActiveId);
+  const stUseWechat = typeof raw?.stUseWechat === "boolean" ? raw.stUseWechat : Boolean(stWechatActiveId);
+  const stPresetId = picked;
+  const settings: Settings = {
     ...defaultSettings(),
     ...(raw ?? {}),
     grokModelId: migrateGrokId(raw?.grokModelId),
@@ -123,10 +139,18 @@ export async function loadAll() {
     llmStarred: raw?.llmStarred ?? [],
     llmAccounts: parseLlmAccounts(raw?.llmAccounts),
     stPresets,
-    stActiveId,
-    stParamSnapshot: stActiveId && raw?.stParamSnapshot ? mergeLlmParams(raw.stParamSnapshot) : null,
-    stImageActiveId,
-    stWechatActiveId,
+    stActiveId: stUseChat ? stPresetId : null,
+    stParamSnapshot:
+      (stUseChat || stUseImage || stUseWechat) && raw?.stParamSnapshot ? mergeLlmParams(raw.stParamSnapshot) : null,
+    stImageActiveId: stUseImage ? stPresetId : null,
+    stWechatActiveId: stUseWechat ? stPresetId : null,
+    stPresetId,
+    stUseChat,
+    stUseImage,
+    stUseWechat,
+    naiImageSource: raw?.naiImageSource === "official" ? "official" : "proxy",
+    naiOfficialKey: typeof raw?.naiOfficialKey === "string" ? raw.naiOfficialKey : "",
+    naiOfficialConnected: raw?.naiOfficialConnected === true,
     chatSource: raw?.chatSource === "api" && raw?.llmConnected ? ("api" as const) : ("grok" as const),
     chatImage: raw?.chatImage !== false,
     imageModelId: typeof raw?.imageModelId === "string" ? raw.imageModelId : null,

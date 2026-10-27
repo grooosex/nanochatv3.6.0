@@ -2,12 +2,12 @@ import { i as __toESM, n as __exportAll } from "../_runtime.mjs";
 import { d as require_react_dom, q as require_react, x as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
 import { i as zipSync, n as strToU8, r as unzipSync, t as strFromU8 } from "../_libs/fflate.mjs";
 import { A as Eye, B as Bookmark, C as LoaderCircle, D as FolderPlus, E as Folder, F as ChevronUp, H as ArrowDown, I as ChevronRight, L as ChevronLeft, M as Download, N as Copy, O as FolderInput, P as Clock, R as ChevronDown, S as Lock, T as GitBranch, U as AlignJustify, V as ArrowUp, _ as Minus, a as Trash2, b as Menu, c as Sparkles, d as Settings, f as ScanSearch, g as Moon, h as Pencil, j as Ellipsis, k as FileUp, l as Smile, m as Plus, n as WandSparkles, o as Sun, p as RefreshCw, r as Upload, s as Star, t as X, u as SlidersHorizontal, v as Minimize2, w as Image, x as Maximize2, y as MessageCircle, z as Check } from "../_libs/lucide-react.mjs";
-import { A as NAI_MODELS, B as defaultPureParams, C as DEFAULT_STATUS_BAR, D as IMAGE_DRAW_TIMEOUT_MS, E as GROK_MODELS$1, F as SAMPLERS, G as normalizePureParams, H as joinPromptParts, I as SENSITIVE_PREFIX, K as shortModelLabel, L as UC, M as NOISE_SCHEDULES, N as PLACEHOLDERS, O as IMAGE_GEN_TIMEOUT_MS, P as RESOLUTIONS, R as UNCENSORED_TAG, S as DEFAULT_NAI_BASE, T as FURRY_TAG, U as mergeLlmParams, V as emptyCharacter, W as migrateGrokId, _ as wechatGroupCastFormat, a as IMAGE_SHOT_RULES, b as DEFAULT_GROK, c as fieldPolishHint, d as imageLengthRules, f as imageWriteMaxTokens, g as voicePolishExtra, h as splitChatPrompt, i as IMAGE_MULTI_RULES, j as NAI_POLL_MS, k as NAI_HOP_TIMEOUT_MS, l as groupFormatHint, m as roleSnapshot, n as FIELD_LABELS, o as chatContextBlock, p as multiInsertInstruction, q as __exportAll$1, r as IMAGE_BG_RULES, s as chatImageSystem, u as imageApplyRules, v as wechatImageTail, w as FULLBODY_TAG, x as DEFAULT_LLM_PARAMS, y as COOLDOWN_MS, z as defaultImageParams } from "./router-CCtQaUUZ.mjs";
+import { A as NAI_MODELS, B as defaultPureParams, C as DEFAULT_STATUS_BAR, D as IMAGE_DRAW_TIMEOUT_MS, E as GROK_MODELS$1, F as SAMPLERS, G as normalizePureParams, H as joinPromptParts, I as SENSITIVE_PREFIX, K as shortModelLabel, L as UC, M as NOISE_SCHEDULES, N as PLACEHOLDERS, O as IMAGE_GEN_TIMEOUT_MS, P as RESOLUTIONS, R as UNCENSORED_TAG, S as DEFAULT_NAI_BASE, T as FURRY_TAG, U as mergeLlmParams, V as emptyCharacter, W as migrateGrokId, _ as wechatGroupCastFormat, a as IMAGE_SHOT_RULES, b as DEFAULT_GROK, c as fieldPolishHint, d as imageLengthRules, f as imageWriteMaxTokens, g as voicePolishExtra, h as splitChatPrompt, i as IMAGE_MULTI_RULES, j as NAI_POLL_MS, k as NAI_HOP_TIMEOUT_MS, l as groupFormatHint, m as roleSnapshot, n as FIELD_LABELS, o as chatContextBlock, p as multiInsertInstruction, q as __exportAll$1, r as IMAGE_BG_RULES, s as chatImageSystem, u as imageApplyRules, v as wechatImageTail, w as FULLBODY_TAG, x as DEFAULT_LLM_PARAMS, y as COOLDOWN_MS, z as defaultImageParams } from "./router-QasONoEq.mjs";
 import { t as Dexie } from "../_libs/dexie.mjs";
 import { t as clsx } from "../_libs/clsx.mjs";
 import { t as twMerge } from "../_libs/tailwind-merge.mjs";
 import { t as create } from "../_libs/zustand.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/idb-W6IrfdzR.js
+//#region node_modules/.nitro/vite/services/ssr/assets/idb-CoglPG_V.js
 function cn(...inputs) {
 	return twMerge(clsx(inputs));
 }
@@ -106,6 +106,23 @@ function num$1(v) {
 function str$1(v) {
 	return typeof v === "string" ? v : "";
 }
+function parseItems(raw) {
+	if (!Array.isArray(raw)) return void 0;
+	const out = [];
+	for (const row of raw) {
+		const o = rec$1(row);
+		if (!o || typeof o.id !== "string" || typeof o.name !== "string") continue;
+		out.push({
+			id: o.id,
+			name: o.name,
+			content: str$1(o.content),
+			enabled: o.enabled === true,
+			place: o.place === "after" ? "after" : "before",
+			usable: o.usable !== false
+		});
+	}
+	return out;
+}
 function parseStPresets(raw) {
 	if (!Array.isArray(raw)) return [];
 	const out = [];
@@ -113,6 +130,7 @@ function parseStPresets(raw) {
 		const o = rec$1(row);
 		if (!o) continue;
 		if (typeof o.id !== "string" || typeof o.name !== "string") continue;
+		const items = parseItems(o.items);
 		out.push({
 			id: o.id,
 			name: o.name,
@@ -124,7 +142,8 @@ function parseStPresets(raw) {
 				frequencyPenalty: num$1(o.params && rec$1(o.params)?.frequencyPenalty),
 				presencePenalty: num$1(o.params && rec$1(o.params)?.presencePenalty),
 				maxTokens: num$1(o.params && rec$1(o.params)?.maxTokens)
-			}
+			},
+			...items ? { items } : {}
 		});
 	}
 	return out;
@@ -146,43 +165,72 @@ function readPrompt(v) {
 		content,
 		marker: o.marker === true,
 		role: str$1(o.role).toLowerCase() || "system",
-		injectionPosition: num$1(o.injection_position) ?? 0
+		injectionPosition: num$1(o.injection_position) ?? 0,
+		enabled: o.enabled !== false
 	};
 }
-function enabledOrder(raw, prompts) {
-	const byId = new Map(prompts.map((p) => [p.identifier, p]));
+function pickOrder(raw) {
 	const orders = Array.isArray(raw.prompt_order) ? raw.prompt_order : [];
-	let order = [];
+	let global = null;
+	let best = [];
 	for (const entry of orders) {
 		const o = rec$1(entry);
 		if (!o || !Array.isArray(o.order)) continue;
-		if (o.character_id === 1e5 || o.character_id === "100000" || !order.length) order = o.order;
-		if (o.character_id === 1e5 || o.character_id === "100000") break;
+		const rows = o.order.map((row) => {
+			const r = rec$1(row);
+			if (!r) return null;
+			const identifier = str$1(r.identifier);
+			if (!identifier) return null;
+			return {
+				identifier,
+				enabled: r.enabled !== false
+			};
+		}).filter((row) => Boolean(row));
+		if (o.character_id === 1e5 || o.character_id === "100000") global = rows;
+		if (rows.length > best.length) best = rows;
 	}
-	if (!order.length) return prompts;
-	const out = [];
-	const seen = /* @__PURE__ */ new Set();
-	for (const row of order) {
-		const o = rec$1(row);
-		if (!o) continue;
-		if (o.enabled === false) continue;
-		const id = str$1(o.identifier);
-		const p = byId.get(id);
-		if (!p || seen.has(id)) continue;
-		seen.add(id);
-		out.push(p);
-	}
-	return out;
+	if (global && global.length) return global;
+	return best;
 }
-function isPostHistory(p) {
-	const id = p.identifier.toLowerCase();
-	const name = p.name.toLowerCase();
-	return id === "jailbreak" || name.includes("post-history") || name.includes("post history") || p.injectionPosition === 1;
+function isHistoryMarker(p) {
+	return p.identifier === "chatHistory" || p.name.trim().toLowerCase() === "chat history";
 }
-function isPlaceholder(p) {
+function isSlot(p) {
 	if (p.marker) return true;
 	if (PLACEHOLDER_IDS.has(p.identifier)) return true;
 	return false;
+}
+function isUnusable(p) {
+	if (isSlot(p)) return true;
+	if (p.name.includes("防截断")) return true;
+	if (p.name === "SPreset配置" || p.content.length > 2e4) return true;
+	return false;
+}
+function isAfter(p, passedHistory) {
+	if (p.injectionPosition === 1) return true;
+	const id = p.identifier.toLowerCase();
+	const name = p.name.toLowerCase();
+	if (id === "jailbreak" || name.includes("post-history") || name.includes("post history")) return true;
+	return passedHistory;
+}
+function presetTexts(preset) {
+	if (!preset.items?.length) return {
+		systemPrompt: preset.systemPrompt,
+		postHistory: preset.postHistory
+	};
+	const on = preset.items.filter((item) => item.enabled && item.usable && item.content.trim());
+	return {
+		systemPrompt: on.filter((item) => item.place !== "after").map((item) => item.content.trim()).join("\n\n"),
+		postHistory: on.filter((item) => item.place === "after").map((item) => item.content.trim()).join("\n\n")
+	};
+}
+function sealPreset(preset) {
+	const texts = presetTexts(preset);
+	return {
+		...preset,
+		systemPrompt: texts.systemPrompt,
+		postHistory: texts.postHistory
+	};
 }
 function parseChatCompletionPreset(raw, fileName) {
 	const o = rec$1(raw);
@@ -192,18 +240,39 @@ function parseChatCompletionPreset(raw, fileName) {
 		if (isTextCompletion(o)) throw new Error("这不是对话补全预设");
 		throw new Error("这不是对话补全预设");
 	}
-	const enabled = enabledOrder(o, o.prompts.map(readPrompt).filter((p) => Boolean(p))).filter((p) => !isPlaceholder(p) && p.content.trim());
-	const systemParts = [];
-	const postParts = [];
-	for (const p of enabled) if (isPostHistory(p)) postParts.push(p.content.trim());
-	else systemParts.push(p.content.trim());
-	if (!systemParts.length && !postParts.length) throw new Error("这份预设没有可导入的提示词");
+	const prompts = o.prompts.map(readPrompt).filter((p) => Boolean(p));
+	const byId = new Map(prompts.map((p) => [p.identifier, p]));
+	const order = pickOrder(o);
+	const listed = order.length ? order.map((row) => {
+		const p = byId.get(row.identifier);
+		return p ? {
+			...p,
+			enabled: row.enabled
+		} : null;
+	}).filter((p) => Boolean(p)) : prompts;
+	let passedHistory = false;
+	const items = [];
+	for (const p of listed) {
+		const history = isHistoryMarker(p);
+		const place = isAfter(p, passedHistory) ? "after" : "before";
+		if (history) passedHistory = true;
+		items.push({
+			id: p.identifier,
+			name: p.name,
+			content: p.content,
+			enabled: p.enabled,
+			place: history ? "before" : place,
+			usable: !isUnusable(p)
+		});
+	}
+	if (!items.some((item) => item.usable && item.content.trim())) throw new Error("这份预设没有可导入的提示词");
 	const stem = fileName.replace(/\.json$/i, "").trim() || "未命名预设";
-	return {
+	return sealPreset({
 		id: uid("st_"),
 		name: stem,
-		systemPrompt: systemParts.join("\n\n"),
-		postHistory: postParts.join("\n\n"),
+		systemPrompt: "",
+		postHistory: "",
+		items,
 		params: {
 			temperature: num$1(o.temperature),
 			topP: num$1(o.top_p) ?? num$1(o.topP),
@@ -211,7 +280,7 @@ function parseChatCompletionPreset(raw, fileName) {
 			presencePenalty: num$1(o.presence_penalty) ?? num$1(o.presencePenalty),
 			maxTokens: num$1(o.openai_max_tokens) ?? num$1(o.max_tokens) ?? num$1(o.maxTokens)
 		}
-	};
+	});
 }
 function uniquePresetName(desired, existing) {
 	return uniqueNumberedName(desired, existing);
@@ -254,8 +323,9 @@ function imagePresetStyle(settings, chat) {
 	const preset = activeImagePreset(settings);
 	if (!preset) return {};
 	const ctx = macroContext(chat);
-	const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-	const post = substituteMacros(preset.postHistory, ctx).trim();
+	const texts = presetTexts(preset);
+	const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+	const post = substituteMacros(texts.postHistory, ctx).trim();
 	return {
 		styleExtra: sys || void 0,
 		postHistory: [post, "上面的预设只影响怎么理解这一镜。最终输出仍只能是生图标签或规定的 JSON。思考过程不要写进标签。"].filter(Boolean).join("\n\n")
@@ -271,41 +341,63 @@ function wechatPresetStyle(settings, chat, inlineImage = false, group = false) {
 	const preset = activeWechatPreset(settings);
 	if (!preset) return {};
 	const ctx = macroContext(chat);
-	const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-	const post = substituteMacros(preset.postHistory, ctx).trim();
+	const texts = presetTexts(preset);
+	const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+	const post = substituteMacros(texts.postHistory, ctx).trim();
 	return {
 		styleExtra: sys || void 0,
 		postHistory: [post, group ? "上面的预设只影响她们怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要小说，不要状态栏，不要预设自己的消息格式。bubbles 是数组，每项是 {name, text}。inner 和 sticker 按角色名分开。思考不要写进 text 或 inner。bubbles 的先后就是发出顺序。后一条已经看见前一条，不要把每个人写成同时只回用户。" + (inlineImage ? "JSON 结束后另起一行写 <<<PROMPT>>>，里面只许英文 tag，然后 <<<END>>>。" : "") : inlineImage ? "上面的预设只影响她怎么说、什么态度，不能改输出形式。先只输出一个微信 JSON，不要 markdown，不要小说，不要状态栏，不要预设自己的消息格式。思考不要写进 bubbles 或 inner。JSON 结束后另起一行写 <<<PROMPT>>>，里面只许英文 tag，然后 <<<END>>>。" : "上面的预设只影响她怎么说、什么态度，不能改输出形式。最终只能返回一个 JSON，不要 markdown，不要解释，不要小说，不要状态栏，不要预设自己的消息格式：{\"bubbles\":[\"一条文字\"],\"inner\":\"内心\",\"sticker\":0}。思考过程不要写进 bubbles 或 inner。"].filter(Boolean).join("\n\n")
 	};
 }
-function samplerPatch(params, current) {
+function keepLocked(current, next) {
 	return {
+		...next,
+		temperature: current.temperatureLocked ? current.temperature : next.temperature,
+		topP: current.topPLocked ? current.topP : next.topP,
+		frequencyPenalty: current.frequencyPenaltyLocked ? current.frequencyPenalty : next.frequencyPenalty,
+		presencePenalty: current.presencePenaltyLocked ? current.presencePenalty : next.presencePenalty,
+		maxTokens: current.maxTokensLocked ? current.maxTokens : next.maxTokens,
+		contextTurns: current.contextTurnsLocked ? current.contextTurns : next.contextTurns,
+		temperatureLocked: current.temperatureLocked,
+		topPLocked: current.topPLocked,
+		frequencyPenaltyLocked: current.frequencyPenaltyLocked,
+		presencePenaltyLocked: current.presencePenaltyLocked,
+		maxTokensLocked: current.maxTokensLocked,
+		contextTurnsLocked: current.contextTurnsLocked
+	};
+}
+function samplerPatch(params, current) {
+	return keepLocked(current, {
 		...current,
 		temperature: params.temperature ?? current.temperature,
 		topP: params.topP ?? current.topP,
 		frequencyPenalty: params.frequencyPenalty ?? current.frequencyPenalty,
 		presencePenalty: params.presencePenalty ?? current.presencePenalty,
 		maxTokens: params.maxTokens ?? current.maxTokens
-	};
+	});
 }
 function restoreSampler(snapshot, current) {
 	if (!snapshot) return current;
-	return {
+	return keepLocked(current, {
 		...current,
 		temperature: snapshot.temperature,
 		topP: snapshot.topP,
 		frequencyPenalty: snapshot.frequencyPenalty,
 		presencePenalty: snapshot.presencePenalty,
 		maxTokens: snapshot.maxTokens
-	};
+	});
+}
+function defaultSampler(current) {
+	return keepLocked(current, { ...DEFAULT_LLM_PARAMS });
 }
 function presetStyle(settings, task, chat) {
 	if (task === "image" || task === "memory" || task === "rewrite") return {};
 	const preset = activePreset(settings);
 	if (!preset) return {};
 	const ctx = macroContext(chat);
-	const sys = substituteMacros(preset.systemPrompt, ctx).trim();
-	const post = substituteMacros(preset.postHistory, ctx).trim();
+	const texts = presetTexts(preset);
+	const sys = substituteMacros(texts.systemPrompt, ctx).trim();
+	const post = substituteMacros(texts.postHistory, ctx).trim();
 	if (task === "chat") return {
 		styleExtra: sys || void 0,
 		postHistory: post || void 0
@@ -488,9 +580,16 @@ var defaultSettings = () => ({
 	stParamSnapshot: null,
 	stImageActiveId: null,
 	stWechatActiveId: null,
+	stPresetId: null,
+	stUseChat: false,
+	stUseImage: false,
+	stUseWechat: false,
 	naiKey: "",
 	naiBase: DEFAULT_NAI_BASE,
 	naiConnected: false,
+	naiImageSource: "proxy",
+	naiOfficialKey: "",
+	naiOfficialConnected: false,
 	cooldownUntil: 0,
 	chatImage: true,
 	imageModelId: null,
@@ -557,6 +656,11 @@ async function loadAll() {
 	const stActiveId = typeof raw?.stActiveId === "string" && stPresets.some((p) => p.id === raw.stActiveId) ? raw.stActiveId : null;
 	const stImageActiveId = typeof raw?.stImageActiveId === "string" && stPresets.some((p) => p.id === raw.stImageActiveId) ? raw.stImageActiveId : null;
 	const stWechatActiveId = typeof raw?.stWechatActiveId === "string" && stPresets.some((p) => p.id === raw.stWechatActiveId) ? raw.stWechatActiveId : null;
+	const picked = (typeof raw?.stPresetId === "string" && stPresets.some((p) => p.id === raw.stPresetId) ? raw.stPresetId : null) || stActiveId || stWechatActiveId || stImageActiveId;
+	const stUseChat = typeof raw?.stUseChat === "boolean" ? raw.stUseChat : Boolean(stActiveId);
+	const stUseImage = typeof raw?.stUseImage === "boolean" ? raw.stUseImage : Boolean(stImageActiveId);
+	const stUseWechat = typeof raw?.stUseWechat === "boolean" ? raw.stUseWechat : Boolean(stWechatActiveId);
+	const stPresetId = picked;
 	return {
 		chats,
 		folders,
@@ -574,10 +678,17 @@ async function loadAll() {
 			llmStarred: raw?.llmStarred ?? [],
 			llmAccounts: parseLlmAccounts(raw?.llmAccounts),
 			stPresets,
-			stActiveId,
-			stParamSnapshot: stActiveId && raw?.stParamSnapshot ? mergeLlmParams(raw.stParamSnapshot) : null,
-			stImageActiveId,
-			stWechatActiveId,
+			stActiveId: stUseChat ? stPresetId : null,
+			stParamSnapshot: (stUseChat || stUseImage || stUseWechat) && raw?.stParamSnapshot ? mergeLlmParams(raw.stParamSnapshot) : null,
+			stImageActiveId: stUseImage ? stPresetId : null,
+			stWechatActiveId: stUseWechat ? stPresetId : null,
+			stPresetId,
+			stUseChat,
+			stUseImage,
+			stUseWechat,
+			naiImageSource: raw?.naiImageSource === "official" ? "official" : "proxy",
+			naiOfficialKey: typeof raw?.naiOfficialKey === "string" ? raw.naiOfficialKey : "",
+			naiOfficialConnected: raw?.naiOfficialConnected === true,
 			chatSource: raw?.chatSource === "api" && raw?.llmConnected ? "api" : "grok",
 			chatImage: raw?.chatImage !== false,
 			imageModelId: typeof raw?.imageModelId === "string" ? raw.imageModelId : null,
@@ -620,8 +731,8 @@ function cachedUrl(id) {
 	return id ? urlCache.get(id) ?? null : null;
 }
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-0c1R9zPH.js
-var routes_0c1R9zPH_exports = /* @__PURE__ */ __exportAll({
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-BYUT84xK.js
+var routes_BYUT84xK_exports = /* @__PURE__ */ __exportAll({
 	a: () => cancelMemory,
 	c: () => regenMessage,
 	component: () => Home,
@@ -1339,6 +1450,7 @@ async function importArchive(file) {
 			...prevVal ?? {},
 			...dumpS,
 			naiKey: dumpS?.naiKey || prevVal?.naiKey || "",
+			naiOfficialKey: dumpS?.naiOfficialKey || prevVal?.naiOfficialKey || "",
 			llmKey: dumpS?.llmKey || prevVal?.llmKey || "",
 			llmAccounts: Array.isArray(dumpS?.llmAccounts) ? dumpS.llmAccounts : prevVal?.llmAccounts ?? [],
 			stPresets: Array.isArray(dumpS?.stPresets) ? dumpS.stPresets : prevVal?.stPresets ?? [],
@@ -1382,6 +1494,20 @@ function cloneChat(chat, nameSuffix = "(副本)") {
 		isDraft: false,
 		messages: structuredClone(chat.messages)
 	};
+}
+var NAI_OFFICIAL_BASE = "https://image.novelai.net";
+function naiDrawAuth(settings) {
+	if (settings.naiImageSource === "official" && settings.naiOfficialConnected && settings.naiOfficialKey?.trim()) return {
+		mode: "official",
+		apiKey: settings.naiOfficialKey.trim(),
+		baseUrl: NAI_OFFICIAL_BASE
+	};
+	if (settings.naiConnected && settings.naiKey?.trim()) return {
+		mode: "proxy",
+		apiKey: settings.naiKey.trim(),
+		baseUrl: settings.naiBase || "https://api.idlecloud.cc"
+	};
+	return null;
 }
 function naiMeta(model) {
 	return NAI_MODELS.find((m) => m.id === model);
@@ -2252,8 +2378,8 @@ var useApp = create((set, get) => ({
 			id,
 			text
 		}] }));
-		setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 1100);
 	},
+	dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 	setUI: (p) => set((s) => ({ ui: {
 		...s.ui,
 		...p
@@ -4511,8 +4637,8 @@ function sleepMs(ms, signal) {
 function isHopTimeout(e) {
 	return e instanceof Error && e.name === "HopTimeout";
 }
-async function naiHop(body, signal) {
-	const hop = AbortSignal.timeout(NAI_HOP_TIMEOUT_MS);
+async function naiHop(body, signal, timeoutMs = NAI_HOP_TIMEOUT_MS) {
+	const hop = AbortSignal.timeout(timeoutMs);
 	const combined = signal ? AbortSignal.any([signal, hop]) : hop;
 	let res;
 	try {
@@ -4526,7 +4652,7 @@ async function naiHop(body, signal) {
 		if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 		const name = e instanceof Error || e instanceof DOMException ? e.name : "";
 		if (name === "AbortError" || name === "TimeoutError") {
-			const err = /* @__PURE__ */ new Error("中转站超时，请稍后重试");
+			const err = /* @__PURE__ */ new Error(body.action === "official" ? "官网生图超时" : "中转站超时，请稍后重试");
 			err.name = "HopTimeout";
 			throw err;
 		}
@@ -4587,6 +4713,28 @@ async function generateNai(opts) {
 		baseUrl: opts.baseUrl,
 		apiKey: opts.apiKey
 	};
+	if (opts.mode === "official") {
+		const parameters = { ...built.parameters };
+		let action = "generate";
+		if (img2img) {
+			action = "img2img";
+			parameters.image = img2img.image;
+			parameters.strength = img2img.strength;
+			parameters.noise = img2img.noise;
+		}
+		const hop = await naiHop({
+			action: "official",
+			apiKey: opts.apiKey,
+			payload: {
+				input: built.input,
+				model: built.model,
+				action,
+				parameters
+			}
+		}, opts.signal, 1e5);
+		if (!hop.image) throw new Error("官网没有返回图片");
+		return finish(hop.image);
+	}
 	const started = Date.now();
 	const timedOut = () => Date.now() - started >= IMAGE_DRAW_TIMEOUT_MS;
 	let submit;
@@ -6108,7 +6256,8 @@ async function paintWechat(chat, lineId, mode, custom, customChars, parsedTags) 
 	imageStops.set(key, ac);
 	try {
 		const settings = useApp.getState().settings;
-		if (!settings.naiKey) throw new Error("还没连接 NAI 中转站");
+		const auth = naiDrawAuth(settings);
+		if (!auth) throw new Error("还没连接生图");
 		let grokTail = custom ? sanitizeNaiTags(custom, { stripForbidden: false }) : "";
 		let charTails = {};
 		if (customChars) for (const [k, v] of Object.entries(customChars)) {
@@ -6210,12 +6359,13 @@ async function paintWechat(chat, lineId, mode, custom, customChars, parsedTags) 
 			grokTail,
 			charTails,
 			seed: record.seed,
-			apiKey: settings.naiKey,
-			baseUrl: settings.naiBase,
+			apiKey: auth.apiKey,
+			baseUrl: auth.baseUrl,
+			mode: auth.mode,
 			signal: ac.signal,
 			onStart: () => setImg({ status: "generating" }),
 			onReceiving: () => {
-				useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+				if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
 				setImg({ status: "receiving" });
 			}
 		});
@@ -6616,10 +6766,11 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 			} : g)
 		} : m)
 	}));
-	if (!settings.naiKey) {
+	const auth = naiDrawAuth(settings);
+	if (!auth) {
 		setImg({
 			status: "error",
-			error: "还没连接 NAI 中转站"
+			error: "还没连接生图"
 		});
 		return;
 	}
@@ -6672,13 +6823,14 @@ async function attachImage(id, msgId, mode = "auto", custom, customChars, parsed
 			grokTail,
 			charTails,
 			seed: img.seed,
-			apiKey: settings.naiKey,
-			baseUrl: settings.naiBase,
+			apiKey: auth.apiKey,
+			baseUrl: auth.baseUrl,
+			mode: auth.mode,
 			turnImageBlobId: turnI2iBlob(live, msgId),
 			signal: ac.signal,
 			onStart: () => setImg({ status: "generating" }),
 			onReceiving: () => {
-				useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+				if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
 				setImg({ status: "receiving" });
 			}
 		});
@@ -7473,14 +7625,17 @@ function TextInput({ className, ...rest }) {
 		...rest
 	});
 }
-function Switch({ on, onChange, label }) {
+function Switch({ on, onChange, label, disabled }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 		type: "button",
 		role: "switch",
 		"aria-checked": on,
 		"aria-label": label,
-		onClick: () => onChange(!on),
-		className: cn("relative inline-flex h-7 w-12 shrink-0 items-center overflow-hidden rounded-full p-0.5 transition-colors", on ? "bg-primary" : "bg-line-strong"),
+		disabled,
+		onClick: () => {
+			if (!disabled) onChange(!on);
+		},
+		className: cn("relative inline-flex h-7 w-12 shrink-0 items-center overflow-hidden rounded-full p-0.5 transition-colors", on ? "bg-primary" : "bg-line-strong", disabled && "opacity-40"),
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: cn("block size-6 rounded-full bg-card shadow-sm transition-transform", on ? "translate-x-5" : "translate-x-0") })
 	});
 }
@@ -7577,14 +7732,43 @@ function ExpandSelect({ value, options, onChange, render, className, align = "ce
 		})]
 	});
 }
+function ToastCard({ id, text }) {
+	const [held, setHeld] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (held) return;
+		const timer = window.setTimeout(() => useApp.getState().dismissToast(id), 2e3);
+		return () => window.clearTimeout(timer);
+	}, [held, id]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "pointer-events-auto relative w-full max-w-full rounded-[18px] bg-good py-2.5 pl-4 pr-9 text-[13px] leading-snug text-on-primary shadow-lg",
+		style: { animation: "toast-in 180ms ease" },
+		onClick: () => setHeld(true),
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex items-start gap-2",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "mt-0.5 size-4 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "min-w-0 whitespace-pre-wrap break-words",
+				children: text
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "absolute right-1.5 top-1.5 grid size-6 place-items-center",
+			"aria-label": "关闭",
+			onClick: (e) => {
+				e.stopPropagation();
+				useApp.getState().dismissToast(id);
+			},
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3.5" })
+		})]
+	});
+}
 function ToastHost() {
 	const toasts = useApp((s) => s.toasts);
+	if (toasts.length === 0) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "pointer-events-none fixed inset-x-0 top-3 z-[80] flex justify-center px-4",
-		children: toasts.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "flex items-center gap-2 rounded-full bg-good px-4 py-2 text-[13px] text-on-primary shadow-lg",
-			style: { animation: "toast-in 180ms ease" },
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-4" }), t.text]
+		className: "pointer-events-none fixed inset-x-0 top-3 z-[80] flex flex-col items-center gap-2 px-4",
+		children: toasts.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToastCard, {
+			id: t.id,
+			text: t.text
 		}, t.id))
 	});
 }
@@ -10201,75 +10385,28 @@ function ConnectionPanel() {
 	const open = useApp((s) => s.ui.connection);
 	const settings = useApp((s) => s.settings);
 	const setUI = useApp((s) => s.setUI);
-	const [key, setKey] = (0, import_react.useState)(settings.naiKey);
-	const [base, setBase] = (0, import_react.useState)(settings.naiBase || "https://api.idlecloud.cc");
-	const [busy, setBusy] = (0, import_react.useState)(false);
-	const [err, setErr] = (0, import_react.useState)("");
 	const [dl, setDl] = (0, import_react.useState)(false);
-	const [apiOpen, setApiOpen] = (0, import_react.useState)(false);
+	const [page, setPage] = (0, import_react.useState)(null);
 	const llmSettings = useApp((s) => s.ui.llmSettings);
 	(0, import_react.useEffect)(() => {
 		if (!open || !llmSettings) return;
-		setApiOpen(true);
+		setPage("chat");
 		useApp.getState().setUI({ llmSettings: false });
 	}, [open, llmSettings]);
 	(0, import_react.useEffect)(() => {
-		if (!open) setApiOpen(false);
+		if (!open) setPage(null);
 	}, [open]);
 	if (!open) return null;
 	const close = () => {
-		setApiOpen(false);
+		setPage(null);
 		setUI({ connection: false });
-	};
-	const save = async () => {
-		setBusy(true);
-		setErr("");
-		try {
-			const data = await (await fetch("/api/nai", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					action: "test",
-					baseUrl: base,
-					apiKey: key
-				})
-			})).json();
-			if (!data.ok) {
-				setErr(data.error || "连接失败");
-				useApp.getState().setSettings({
-					naiKey: key,
-					naiBase: base,
-					naiConnected: false
-				});
-				return;
-			}
-			useApp.getState().setSettings({
-				naiKey: key,
-				naiBase: base,
-				naiConnected: true
-			});
-			useApp.getState().toast("已连接");
-		} catch (e) {
-			setErr(e instanceof Error ? e.message : "连接失败");
-		} finally {
-			setBusy(false);
-		}
-	};
-	const selectGrok = () => useApp.getState().setSettings({ chatSource: "grok" });
-	const selectApi = () => {
-		if (!settings.llmConnected) {
-			useApp.getState().toast("先连接 API");
-			setApiOpen(true);
-			return;
-		}
-		useApp.getState().setSettings({ chatSource: "api" });
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "absolute inset-0 z-50 flex justify-center px-4 py-8",
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-overlay/40" }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(SheetCard, {
-				title: "连接",
+				title: "设置",
 				titleExtra: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 					className: "flex items-center gap-1.5 text-[13px] text-muted",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
@@ -10320,97 +10457,17 @@ function ConnectionPanel() {
 							]
 						})]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-						type: "button",
-						onClick: selectGrok,
-						className: cn("mb-3 w-full rounded-[18px] border p-4 text-left", settings.chatSource === "grok" ? "border-primary bg-primary-soft" : "border-line bg-card"),
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "mb-1 font-medium",
-							children: "Grok"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-							className: "text-[12px] leading-relaxed text-muted",
-							children: "已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.7 / 4.6 / 4.5 均衡、专家、快速。"
-						})]
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GearRow, {
+						label: "聊天补全 AI",
+						onClick: () => setPage("chat")
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						role: "button",
-						tabIndex: 0,
-						onClick: selectApi,
-						onKeyDown: (e) => {
-							if (e.key === "Enter" || e.key === " ") selectApi();
-						},
-						className: cn("mb-4 flex w-full items-center gap-3 rounded-[18px] border p-4 text-left", settings.chatSource === "api" ? "border-primary bg-primary-soft" : "border-line bg-card"),
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "min-w-0 flex-1",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-								className: "font-medium",
-								children: "API 连接"
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-								className: "mt-0.5 truncate text-[12px] text-muted",
-								children: settings.llmConnected ? settings.llmModel ? shortModelLabel(settings.llmModel) : "已连接，去设置里选模型" : "未连接。点齿轮填写网址和密钥"
-							})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "flex shrink-0 items-center gap-1",
-							onClick: (e) => e.stopPropagation(),
-							children: [settings.llmConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-5 text-good" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5 text-danger" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: "grid size-9 place-items-center rounded-full hover:bg-dim",
-								onClick: () => setApiOpen(true),
-								"aria-label": "API 设置",
-								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Settings, { className: "size-5" })
-							})]
-						})]
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GearRow, {
+						label: "生图 AI",
+						onClick: () => setPage("image")
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "mb-1 flex items-center justify-between",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-							className: "text-[14px] font-medium",
-							children: "NAI 中转站 API Key"
-						}), settings.naiConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-							className: "flex items-center gap-2 text-[12px]",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-								className: "flex items-center gap-1 text-good",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3.5" }), " 已连接"]
-							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-								className: "text-muted",
-								onClick: () => {
-									useApp.getState().setSettings({
-										naiConnected: false,
-										naiKey: ""
-									});
-									setKey("");
-								},
-								children: "退出"
-							})]
-						}) : null]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
-						type: "password",
-						value: key,
-						placeholder: "",
-						onChange: (e) => setKey(e.target.value)
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "mb-3 mt-1 text-[11px] text-muted",
-						children: "进阶档位以上可生成 Key。Key 只保存在你这台设备上。点保存后即可聊天配图和纯生图。"
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "mb-1 text-[14px] font-medium",
-						children: "中转站地址"
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
-						value: base,
-						onChange: (e) => setBase(e.target.value)
-					}),
-					err && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "mt-2 text-[12px] text-danger",
-						children: err
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
-						className: "mt-4",
-						busy,
-						onClick: () => void save(),
-						children: "保存"
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GearRow, {
+						label: "预设设置",
+						onClick: () => setPage("preset")
 					})
 				]
 			}),
@@ -10448,14 +10505,19 @@ function ConnectionPanel() {
 					]
 				})]
 			}),
-			apiOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			page && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "absolute inset-0 z-20 flex justify-center px-4 py-8",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "absolute inset-0 bg-overlay/40",
-					onClick: () => setApiOpen(false),
-					"aria-label": "关闭"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApiSettingsSheet, { onClose: () => setApiOpen(false) })]
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "absolute inset-0 bg-overlay/40",
+						onClick: () => setPage(null),
+						"aria-label": "返回"
+					}),
+					page === "chat" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatAiSheet, { onClose: () => setPage(null) }),
+					page === "image" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ImageAiSheet, { onClose: () => setPage(null) }),
+					page === "preset" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PresetSheet, { onClose: () => setPage(null) })
+				]
 			})
 		]
 	});
@@ -10485,7 +10547,18 @@ function SheetCard({ title, titleExtra, onClose, children }) {
 		})]
 	});
 }
-function ApiSettingsSheet({ onClose }) {
+function GearRow({ label, onClick }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		type: "button",
+		onClick,
+		className: "mb-3 flex w-full items-center justify-between rounded-[18px] border border-line bg-card px-4 py-4 text-left active:bg-dim",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "text-[15px]",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Settings, { className: "size-5 text-muted" })]
+	});
+}
+function ChatAiSheet({ onClose }) {
 	const settings = useApp((s) => s.settings);
 	const [url, setUrl] = (0, import_react.useState)(settings.llmBase);
 	const [key, setKey] = (0, import_react.useState)(settings.llmKey);
@@ -10494,6 +10567,7 @@ function ApiSettingsSheet({ onClose }) {
 	const [err, setErr] = (0, import_react.useState)("");
 	const [saveOpen, setSaveOpen] = (0, import_react.useState)(false);
 	const [saveName, setSaveName] = (0, import_react.useState)("");
+	const [showApi, setShowApi] = (0, import_react.useState)(settings.chatSource === "api");
 	(0, import_react.useEffect)(() => {
 		setUrl(settings.llmBase);
 		setKey(settings.llmKey);
@@ -10563,220 +10637,167 @@ function ApiSettingsSheet({ onClose }) {
 		setSaveOpen(false);
 		setSaveName("");
 	};
-	const p = settings.llmParams;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(SheetCard, {
-		title: "API 设置",
+		title: "聊天补全 AI",
 		onClose,
 		children: [
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mb-1 flex items-center justify-between text-[14px] font-medium",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "网址" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "text-[12px] font-normal text-muted",
-					onClick: () => {
-						if (!url.trim() || !key.trim()) {
-							useApp.getState().toast("请填写网址和密钥");
-							return;
-						}
-						setSaveName("");
-						setSaveOpen(true);
-					},
-					children: "保存"
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				onClick: () => {
+					setShowApi(false);
+					useApp.getState().setSettings({ chatSource: "grok" });
+				},
+				className: cn("mb-3 w-full rounded-[18px] border p-4 text-left", settings.chatSource === "grok" ? "border-primary bg-primary-soft" : "border-line bg-card"),
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-1 font-medium",
+					children: "Grok"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-[12px] leading-relaxed text-muted",
+					children: "已使用当前 Grok 会员账号，无需再登录。选中后聊天、润色、写提示词都走 Grok。顶栏切换 4.7 / 4.6 / 4.5 均衡、专家、快速。"
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
-				value: url,
-				placeholder: "https://api.siliconflow.cn/v1",
-				onChange: (e) => setUrl(e.target.value)
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "mb-3 mt-1 text-[11px] text-muted",
-				children: "OpenAI 兼容。末尾 /v1 即可，不必写到 chat/completions。"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AccountPicker, {
-				accounts: settings.llmAccounts ?? [],
-				keyValue: key,
-				onKeyChange: setKey,
-				busy,
-				exit: settings.llmConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "text-[12px] text-muted",
-					onClick: disconnect,
-					children: "退出"
-				}) : null,
-				onPick: (a) => {
-					const s = useApp.getState().settings;
-					if (s.llmBase || s.llmKey) useApp.getState().setSettings({ llmAccounts: snapshotLlmAccount(s.llmAccounts ?? [], s.llmBase, s.llmKey, s.llmStarred, s.llmModel) });
-					setUrl(a.base);
-					setKey(a.key);
-					connect({
-						url: a.base,
-						key: a.key,
-						starred: a.starred,
-						model: a.model,
-						toast: `已应用密钥（${a.name}）`
-					});
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				onClick: () => {
+					setShowApi(true);
+					if (settings.llmConnected) useApp.getState().setSettings({ chatSource: "api" });
 				},
-				onDelete: (id) => useApp.getState().setSettings({ llmAccounts: (settings.llmAccounts ?? []).filter((a) => a.id !== id) })
-			}),
-			err && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "mt-2 text-[12px] text-danger",
-				children: err
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
-				className: cn("mt-3", settings.llmConnected && "bg-good hover:bg-good"),
-				busy,
-				onClick: () => void connect(),
-				children: settings.llmConnected ? "已连接 · 重新拉取" : "连接"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "mt-5 mb-1 text-[14px] font-medium",
-				children: "可用模型"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-				className: "mb-2 text-[11px] text-muted",
-				children: "列表来自接口。点选即当前模型，星标会进聊天顶栏。"
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ModelPicker, {
-				models: settings.llmModels,
-				current: settings.llmModel,
-				starred: settings.llmStarred,
-				connected: settings.llmConnected,
-				onPick: (id) => {
-					useApp.getState().setSettings(applyLlmPick(settings, id));
-				},
-				onStar: (id) => {
-					const llmStarred = pruneStarred(settings.llmStarred.includes(id) ? settings.llmStarred.filter((x) => x !== id) : [...settings.llmStarred, id], settings.llmModels, settings.llmModel);
-					useApp.getState().setSettings({
-						llmStarred,
-						llmAccounts: snapshotLlmAccount(settings.llmAccounts ?? [], settings.llmBase, settings.llmKey, llmStarred, settings.llmModel)
-					});
-				}
-			}),
-			settings.llmConnected && settings.llmModels.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-3",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "mb-1 text-[13px]",
-					children: "手填模型名"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "flex gap-2",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
-						value: manual,
-						placeholder: "deepseek-ai/DeepSeek-V3.2",
-						onChange: (e) => setManual(e.target.value)
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: "shrink-0 rounded-full bg-primary px-4 text-[13px] text-on-primary",
-						onClick: () => {
-							const id = manual.trim();
-							if (!id) return;
-							useApp.getState().setSettings({
-								llmModel: id,
-								llmModels: [id],
-								llmStarred: settings.llmStarred.includes(id) ? settings.llmStarred : [...settings.llmStarred, id]
-							});
-						},
-						children: "使用"
+				className: cn("mb-4 flex w-full items-center gap-3 rounded-[18px] border p-4 text-left", showApi || settings.chatSource === "api" ? "border-primary bg-primary-soft" : "border-line bg-card"),
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "min-w-0 flex-1",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "font-medium",
+						children: "API 连接"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-0.5 truncate text-[12px] text-muted",
+						children: settings.llmConnected ? settings.llmModel ? shortModelLabel(settings.llmModel) : "已连接" : "未连接"
 					})]
-				})]
+				}), settings.llmConnected && settings.chatSource === "api" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-5 shrink-0 text-good" }) : null]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-				className: "mt-2 text-[12px] text-muted",
-				children: [
-					"当前：",
-					settings.llmModel ? shortModelLabel(settings.llmModel) : "未选",
-					" · 常用",
-					" ",
-					pruneStarred(settings.llmStarred, settings.llmModels, settings.llmModel).length
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPresetPicker, { mode: "chat" }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPresetPicker, { mode: "image" }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPresetPicker, { mode: "wechat" }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "mt-5 mb-2 flex items-center justify-between",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "text-[14px] font-medium",
-					children: "预设"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "text-[12px] text-muted",
-					onClick: () => useApp.getState().setSettings({ llmParams: { ...DEFAULT_LLM_PARAMS } }),
-					children: "恢复默认"
-				})]
-			}),
-			activePreset(settings) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-				className: "mb-2 text-[11px] text-muted",
-				children: ["采样来自：", activePreset(settings)?.name]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "温度",
-				value: p.temperature,
-				min: 0,
-				max: 2,
-				step: .05,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					temperature: n
-				} })
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "Top P",
-				value: p.topP,
-				min: 0,
-				max: 1,
-				step: .05,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					topP: n
-				} })
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "频率惩罚",
-				value: p.frequencyPenalty,
-				min: 0,
-				max: 2,
-				step: .05,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					frequencyPenalty: n
-				} })
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "存在惩罚",
-				value: p.presencePenalty,
-				min: 0,
-				max: 2,
-				step: .05,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					presencePenalty: n
-				} })
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "最大回复",
-				value: p.maxTokens,
-				min: 256,
-				max: 32e3,
-				step: 256,
-				digits: 0,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					maxTokens: n
-				} })
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
-				label: "上下文（轮）",
-				value: p.contextTurns,
-				min: 4,
-				max: 40,
-				step: 1,
-				digits: 0,
-				onChange: (n) => useApp.getState().setSettings({ llmParams: {
-					...p,
-					contextTurns: n
-				} })
-			}),
+			showApi ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mb-1 flex items-center justify-between text-[14px] font-medium",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "网址" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[12px] font-normal text-muted",
+						onClick: () => {
+							if (!url.trim() || !key.trim()) {
+								useApp.getState().toast("请填写网址和密钥");
+								return;
+							}
+							setSaveName("");
+							setSaveOpen(true);
+						},
+						children: "保存"
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+					value: url,
+					placeholder: "https://api.siliconflow.cn/v1",
+					onChange: (e) => setUrl(e.target.value)
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mb-3 mt-1 text-[11px] text-muted",
+					children: "OpenAI 兼容。末尾 /v1 即可，不必写到 chat/completions。"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AccountPicker, {
+					accounts: settings.llmAccounts ?? [],
+					keyValue: key,
+					onKeyChange: setKey,
+					busy,
+					exit: settings.llmConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[12px] text-muted",
+						onClick: disconnect,
+						children: "退出"
+					}) : null,
+					onPick: (a) => {
+						const s = useApp.getState().settings;
+						if (s.llmBase || s.llmKey) useApp.getState().setSettings({ llmAccounts: snapshotLlmAccount(s.llmAccounts ?? [], s.llmBase, s.llmKey, s.llmStarred, s.llmModel) });
+						setUrl(a.base);
+						setKey(a.key);
+						connect({
+							url: a.base,
+							key: a.key,
+							starred: a.starred,
+							model: a.model,
+							toast: `已应用密钥（${a.name}）`
+						});
+					},
+					onDelete: (id) => useApp.getState().setSettings({ llmAccounts: (settings.llmAccounts ?? []).filter((a) => a.id !== id) })
+				}),
+				err && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mt-2 text-[12px] text-danger",
+					children: err
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
+					className: cn("mt-3", settings.llmConnected && "bg-good hover:bg-good"),
+					busy,
+					onClick: () => void connect(),
+					children: settings.llmConnected ? "已连接 · 重新拉取" : "连接"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-5 mb-1 text-[14px] font-medium",
+					children: "可用模型"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mb-2 text-[11px] text-muted",
+					children: "列表来自接口。点选即当前模型，星标会进聊天顶栏。"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ModelPicker, {
+					models: settings.llmModels,
+					current: settings.llmModel,
+					starred: settings.llmStarred,
+					connected: settings.llmConnected,
+					onPick: (id) => {
+						useApp.getState().setSettings(applyLlmPick(settings, id));
+					},
+					onStar: (id) => {
+						const llmStarred = pruneStarred(settings.llmStarred.includes(id) ? settings.llmStarred.filter((x) => x !== id) : [...settings.llmStarred, id], settings.llmModels, settings.llmModel);
+						useApp.getState().setSettings({
+							llmStarred,
+							llmAccounts: snapshotLlmAccount(settings.llmAccounts ?? [], settings.llmBase, settings.llmKey, llmStarred, settings.llmModel)
+						});
+					}
+				}),
+				settings.llmConnected && settings.llmModels.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-3",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mb-1 text-[13px]",
+						children: "手填模型名"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+							value: manual,
+							placeholder: "deepseek-ai/DeepSeek-V3.2",
+							onChange: (e) => setManual(e.target.value)
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "shrink-0 rounded-full bg-primary px-4 text-[13px] text-on-primary",
+							onClick: () => {
+								const id = manual.trim();
+								if (!id) return;
+								useApp.getState().setSettings({
+									llmModel: id,
+									llmModels: [id],
+									llmStarred: settings.llmStarred.includes(id) ? settings.llmStarred : [...settings.llmStarred, id]
+								});
+							},
+							children: "使用"
+						})]
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "mt-2 text-[12px] text-muted",
+					children: [
+						"当前：",
+						settings.llmModel ? shortModelLabel(settings.llmModel) : "未选",
+						" · 常用",
+						" ",
+						pruneStarred(settings.llmStarred, settings.llmModels, settings.llmModel).length
+					]
+				})
+			] }) : null,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Modal, {
 				open: saveOpen,
 				onClose: () => setSaveOpen(false),
@@ -10797,66 +10818,103 @@ function ApiSettingsSheet({ onClose }) {
 		]
 	});
 }
+function presetUses(s) {
+	return {
+		chat: Boolean(s.stUseChat),
+		image: Boolean(s.stUseImage),
+		wechat: Boolean(s.stUseWechat)
+	};
+}
+function writePresetUse(id, use, extra) {
+	useApp.getState().setSettings({
+		stPresetId: id,
+		stUseChat: use.chat,
+		stUseImage: use.image,
+		stUseWechat: use.wechat,
+		stActiveId: use.chat ? id : null,
+		stImageActiveId: use.image ? id : null,
+		stWechatActiveId: use.wechat ? id : null,
+		...extra
+	});
+}
 function applyStPreset(preset) {
 	const s = useApp.getState().settings;
-	const snapshot = s.stParamSnapshot ?? { ...s.llmParams };
-	useApp.getState().setSettings({
-		stActiveId: preset.id,
-		stParamSnapshot: snapshot,
+	const use = presetUses(s);
+	const none = !use.chat && !use.image && !use.wechat;
+	writePresetUse(preset.id, none ? {
+		chat: true,
+		image: false,
+		wechat: false
+	} : use, {
+		stParamSnapshot: s.stParamSnapshot ?? { ...s.llmParams },
 		llmParams: samplerPatch(preset.params, s.llmParams)
 	});
 	useApp.getState().toast(`已应用预设（${preset.name}）`);
 }
-function applyImagePreset(preset) {
-	useApp.getState().setSettings({ stImageActiveId: preset.id });
-	useApp.getState().toast(`已应用生图预设（${preset.name}）`);
-}
-function cancelImagePreset() {
-	useApp.getState().setSettings({ stImageActiveId: null });
-	useApp.getState().toast("已取消生图预设");
-}
 function cancelStPreset() {
 	const s = useApp.getState().settings;
-	useApp.getState().setSettings({
-		stActiveId: null,
+	writePresetUse(s.stPresetId ?? null, {
+		chat: false,
+		image: false,
+		wechat: false
+	}, {
 		stParamSnapshot: null,
 		llmParams: restoreSampler(s.stParamSnapshot, s.llmParams)
 	});
 	useApp.getState().toast("已取消预设");
 }
-function applyWechatPreset(preset) {
-	useApp.getState().setSettings({ stWechatActiveId: preset.id });
-	useApp.getState().toast(`已应用微信预设（${preset.name}）`);
-}
-function cancelWechatPreset() {
-	useApp.getState().setSettings({ stWechatActiveId: null });
-	useApp.getState().toast("已取消微信预设");
+function setPresetUse(part, on) {
+	const s = useApp.getState().settings;
+	const id = s.stPresetId ?? null;
+	if (on && !id) {
+		useApp.getState().toast("先选择一份预设");
+		return;
+	}
+	const use = presetUses(s);
+	use[part] = on;
+	const anyBefore = Boolean(s.stUseChat || s.stUseImage || s.stUseWechat);
+	const any = use.chat || use.image || use.wechat;
+	const preset = (s.stPresets ?? []).find((p) => p.id === id);
+	if (on && !anyBefore && preset) {
+		writePresetUse(id, use, {
+			stParamSnapshot: s.stParamSnapshot ?? { ...s.llmParams },
+			llmParams: samplerPatch(preset.params, s.llmParams)
+		});
+		return;
+	}
+	if (!any) {
+		writePresetUse(id, use, {
+			stParamSnapshot: null,
+			llmParams: restoreSampler(s.stParamSnapshot, s.llmParams)
+		});
+		return;
+	}
+	writePresetUse(id, use);
 }
 function deleteStPreset(id) {
 	const s = useApp.getState().settings;
 	const next = (s.stPresets ?? []).filter((x) => x.id !== id);
-	const chatWas = s.stActiveId === id;
-	const imageWas = s.stImageActiveId === id;
-	const wechatWas = s.stWechatActiveId === id;
-	useApp.getState().setSettings({
-		stPresets: next,
-		...chatWas ? {
-			stActiveId: null,
-			stParamSnapshot: null,
-			llmParams: restoreSampler(s.stParamSnapshot, s.llmParams)
-		} : {},
-		...imageWas ? { stImageActiveId: null } : {},
-		...wechatWas ? { stWechatActiveId: null } : {}
+	if (!(s.stPresetId === id || s.stActiveId === id || s.stImageActiveId === id || s.stWechatActiveId === id)) {
+		useApp.getState().setSettings({ stPresets: next });
+		return;
+	}
+	writePresetUse(null, {
+		chat: false,
+		image: false,
+		wechat: false
+	}, {
+		stParamSnapshot: null,
+		llmParams: restoreSampler(s.stParamSnapshot, s.llmParams)
 	});
-	if (chatWas) useApp.getState().toast("已取消预设");
-	else if (imageWas) useApp.getState().toast("已取消生图预设");
-	else if (wechatWas) useApp.getState().toast("已取消微信预设");
+	useApp.getState().setSettings({ stPresets: next });
+	useApp.getState().toast("已取消预设");
 }
-function ChatPresetPicker({ mode }) {
+function ChatPresetPicker() {
 	const settings = useApp((s) => s.settings);
 	const presets = settings.stPresets ?? [];
-	const activeId = mode === "chat" ? settings.stActiveId : mode === "image" ? settings.stImageActiveId : settings.stWechatActiveId;
+	const activeId = settings.stPresetId ?? null;
 	const active = presets.find((p) => p.id === activeId) ?? null;
+	const applied = Boolean(active && (settings.stUseChat || settings.stUseImage || settings.stUseWechat));
 	const fileRef = (0, import_react.useRef)(null);
 	const [open, setOpen] = (0, import_react.useState)(false);
 	const [pos, setPos] = (0, import_react.useState)(null);
@@ -10941,105 +10999,568 @@ function ChatPresetPicker({ mode }) {
 			useApp.getState().toast(e instanceof Error ? e.message : "这不是对话补全预设");
 		}
 	};
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-		className: "mt-5",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "mb-2 flex items-center gap-2",
-			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "min-w-0 flex-1 text-[14px] font-medium",
-					children: mode === "chat" ? "对话补全预设" : mode === "image" ? "生图提示词预设" : "微信补全预设"
-				}),
-				mode === "chat" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
-					ref: fileRef,
-					type: "file",
-					accept: ".json,application/json",
-					className: "hidden",
-					onChange: (e) => {
-						const f = e.target.files?.[0];
-						e.target.value = "";
-						if (f) importFile(f);
-					}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mb-2 flex items-center gap-2",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "min-w-0 flex-1 text-[14px] font-medium",
+				children: "预设版本"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				ref: fileRef,
+				type: "file",
+				accept: ".json,application/json",
+				className: "hidden",
+				onChange: (e) => {
+					const f = e.target.files?.[0];
+					e.target.value = "";
+					if (f) importFile(f);
+				}
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "grid size-8 shrink-0 place-items-center text-muted",
+				"aria-label": "导入预设",
+				onClick: () => fileRef.current?.click(),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileUp, { className: "size-4" })
+			}),
+			applied ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				className: "flex shrink-0 items-center gap-2 text-[12px]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: "inline-flex items-center gap-1 text-good",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3.5" }), "已应用"]
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 					type: "button",
-					className: "grid size-8 shrink-0 place-items-center text-muted",
-					"aria-label": "导入预设",
-					onClick: () => fileRef.current?.click(),
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileUp, { className: "size-4" })
-				})] }) : null,
-				active ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-					className: "flex shrink-0 items-center gap-2 text-[12px]",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-						className: "inline-flex items-center gap-1 text-good",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3.5" }), "已应用"]
+					className: "text-muted",
+					onClick: cancelStPreset,
+					children: "取消"
+				})]
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				className: "inline-flex shrink-0 items-center gap-1 text-[12px] text-danger",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3.5" }), "未应用"]
+			})
+		]
+	}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		ref: box,
+		className: "relative",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex h-11 items-center rounded-full border border-line bg-card pl-4 pr-1",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "min-w-0 flex-1 truncate text-left text-[13px]",
+				onClick: () => open ? setOpen(false) : openMenu(),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: active ? "text-ink" : "text-muted",
+					children: active ? active.name : "未选择"
+				})
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "grid size-9 shrink-0 place-items-center text-muted",
+				"aria-label": open ? "收起预设列表" : "展开预设列表",
+				onClick: () => open ? setOpen(false) : openMenu(),
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronDown, { className: cn("size-4 transition", open && "rotate-180") })
+			})]
+		}), open && pos && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			ref: menu,
+			className: "fixed z-[85] overflow-hidden rounded-[16px] border border-line bg-card shadow-[0_16px_40px_rgb(44_40_36/0.16)]",
+			style: {
+				top: pos.top,
+				left: pos.left,
+				width: pos.width
+			},
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "overflow-auto overscroll-contain scroll-hide",
+				style: { maxHeight: pos.maxH },
+				children: presets.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "px-4 py-6 text-center text-[13px] text-muted",
+					children: "还没有导入的预设"
+				}) : presets.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-1 border-b border-line/70 last:border-0",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: cn("min-w-0 flex-1 truncate px-3 py-3 text-left text-[13px]", p.id === active?.id && "text-primary"),
+						onClick: () => {
+							applyStPreset(p);
+							setOpen(false);
+						},
+						children: p.name
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 						type: "button",
-						className: "text-muted",
-						onClick: mode === "chat" ? cancelStPreset : mode === "image" ? cancelImagePreset : cancelWechatPreset,
-						children: "取消"
+						className: "grid size-10 shrink-0 place-items-center text-danger",
+						"aria-label": `删除${p.name}`,
+						onClick: () => deleteStPreset(p.id),
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" })
 					})]
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
-					className: "inline-flex shrink-0 items-center gap-1 text-[12px] text-danger",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3.5" }), "未应用"]
-				})
-			]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			ref: box,
-			className: "relative",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-				className: "flex h-11 items-center rounded-full border border-line bg-card pl-4 pr-1",
+				}, p.id))
+			})
+		}), document.body)]
+	})] });
+}
+async function naiProbe(body) {
+	let j;
+	try {
+		j = await (await fetch("/api/nai", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body)
+		})).json();
+	} catch {
+		throw new Error("无法连接");
+	}
+	if (!j.ok) throw new Error(j.error || "连接失败");
+}
+function ImageAiSheet({ onClose }) {
+	const settings = useApp((s) => s.settings);
+	const source = settings.naiImageSource === "official" ? "official" : "proxy";
+	const [tab, setTab] = (0, import_react.useState)(source);
+	const [base, setBase] = (0, import_react.useState)(settings.naiBase || "https://api.idlecloud.cc");
+	const [key, setKey] = (0, import_react.useState)(settings.naiKey);
+	const [officialKey, setOfficialKey] = (0, import_react.useState)(settings.naiOfficialKey ?? "");
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [err, setErr] = (0, import_react.useState)("");
+	(0, import_react.useEffect)(() => {
+		setBase(settings.naiBase || "https://api.idlecloud.cc");
+		setKey(settings.naiKey);
+		setOfficialKey(settings.naiOfficialKey ?? "");
+	}, [
+		settings.naiBase,
+		settings.naiKey,
+		settings.naiOfficialKey
+	]);
+	const connectProxy = async () => {
+		const b = base.trim() || "https://api.idlecloud.cc";
+		const k = key.trim();
+		if (!k) {
+			useApp.getState().toast("请填写中转站密钥");
+			return;
+		}
+		setBusy(true);
+		setErr("");
+		try {
+			await naiProbe({
+				action: "test",
+				baseUrl: b,
+				apiKey: k
+			});
+			useApp.getState().setSettings({
+				naiBase: b,
+				naiKey: k,
+				naiConnected: true,
+				naiOfficialConnected: false,
+				naiImageSource: "proxy"
+			});
+			useApp.getState().toast("已连接中转站");
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : "连接失败";
+			setErr(msg);
+			useApp.getState().setSettings({
+				naiBase: b,
+				naiKey: k,
+				naiConnected: false
+			});
+		} finally {
+			setBusy(false);
+		}
+	};
+	const connectOfficial = async () => {
+		const k = officialKey.trim().replace(/^Bearer\s+/i, "");
+		if (!k) {
+			useApp.getState().toast("请填写 Persistent Token");
+			return;
+		}
+		setBusy(true);
+		setErr("");
+		try {
+			await naiProbe({
+				action: "official-test",
+				apiKey: k
+			});
+			useApp.getState().setSettings({
+				naiOfficialKey: k,
+				naiOfficialConnected: true,
+				naiConnected: false,
+				naiImageSource: "official"
+			});
+			setOfficialKey(k);
+			useApp.getState().toast("已连接官网");
+		} catch (e) {
+			const msg = e instanceof Error ? e.message : "连接失败";
+			setErr(msg);
+			useApp.getState().setSettings({
+				naiOfficialKey: k,
+				naiOfficialConnected: false
+			});
+		} finally {
+			setBusy(false);
+		}
+	};
+	const proxyOn = Boolean(settings.naiConnected && tab === "proxy" && source === "proxy");
+	const officialOn = Boolean(settings.naiOfficialConnected && tab === "official" && source === "official");
+	const liveOther = tab !== source && (source === "official" ? settings.naiOfficialConnected : settings.naiConnected);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(SheetCard, {
+		title: "生图 AI",
+		onClose,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mb-4 flex rounded-full bg-dim p-1 text-[13px]",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 					type: "button",
-					className: "min-w-0 flex-1 truncate text-left text-[13px]",
-					onClick: () => open ? setOpen(false) : openMenu(),
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-						className: active ? "text-ink" : "text-muted",
-						children: active ? active.name : "未应用"
-					})
+					className: cn("flex-1 rounded-full py-2", tab === "proxy" && "bg-card"),
+					onClick: () => {
+						setErr("");
+						setTab("proxy");
+					},
+					children: "中转站"
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 					type: "button",
-					className: "grid size-9 shrink-0 place-items-center text-muted",
-					"aria-label": open ? "收起预设列表" : "展开预设列表",
-					onClick: () => open ? setOpen(false) : openMenu(),
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronDown, { className: cn("size-4 transition", open && "rotate-180") })
+					className: cn("flex-1 rounded-full py-2", tab === "official" && "bg-card"),
+					onClick: () => {
+						setErr("");
+						setTab("official");
+					},
+					children: "官网 API"
 				})]
-			}), open && pos && (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				ref: menu,
-				className: "fixed z-[85] overflow-hidden rounded-[16px] border border-line bg-card shadow-[0_16px_40px_rgb(44_40_36/0.16)]",
-				style: {
-					top: pos.top,
-					left: pos.left,
-					width: pos.width
-				},
-				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "overflow-auto overscroll-contain scroll-hide",
-					style: { maxHeight: pos.maxH },
-					children: presets.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "px-4 py-6 text-center text-[13px] text-muted",
-						children: "还没有导入的预设"
-					}) : presets.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "flex items-center gap-1 border-b border-line/70 last:border-0",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-							type: "button",
-							className: cn("min-w-0 flex-1 truncate px-3 py-3 text-left text-[13px]", p.id === active?.id && "text-primary"),
-							onClick: () => {
-								if (mode === "chat") applyStPreset(p);
-								else if (mode === "image") applyImagePreset(p);
-								else applyWechatPreset(p);
-								setOpen(false);
-							},
-							children: p.name
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-							type: "button",
-							className: "grid size-10 shrink-0 place-items-center text-danger",
-							"aria-label": `删除${p.name}`,
-							onClick: () => deleteStPreset(p.id),
-							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" })
-						})]
-					}, p.id))
+			}),
+			tab === "proxy" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-1 text-[14px] font-medium",
+					children: "中转站地址"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+					value: base,
+					placeholder: DEFAULT_NAI_BASE,
+					onChange: (e) => {
+						const v = e.target.value;
+						setBase(v);
+						const s = useApp.getState().settings;
+						useApp.getState().setSettings({
+							naiBase: v,
+							naiConnected: Boolean(s.naiConnected && v === s.naiBase)
+						});
+					}
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-1 mt-3 text-[14px] font-medium",
+					children: "中转站 API Key"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+					type: "password",
+					value: key,
+					onChange: (e) => {
+						const v = e.target.value;
+						setKey(v);
+						const s = useApp.getState().settings;
+						useApp.getState().setSettings({
+							naiKey: v,
+							naiConnected: Boolean(s.naiConnected && v === s.naiKey)
+						});
+					}
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-3 flex h-5 justify-end",
+					children: settings.naiConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[12px] text-muted",
+						onClick: () => {
+							useApp.getState().setSettings({ naiConnected: false });
+							useApp.getState().toast("已退出中转站");
+						},
+						children: "退出"
+					}) : null
+				}),
+				err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mb-2 text-[12px] text-danger",
+					children: err
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
+					className: cn(proxyOn && "bg-good hover:bg-good"),
+					busy,
+					onClick: () => void connectProxy(),
+					children: proxyOn ? "已连接" : "连接"
 				})
-			}), document.body)]
-		})]
+			] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mb-1 text-[14px] font-medium",
+					children: "Persistent Token"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextInput, {
+					type: "password",
+					value: officialKey,
+					placeholder: "pst-",
+					onChange: (e) => {
+						const v = e.target.value;
+						setOfficialKey(v);
+						const s = useApp.getState().settings;
+						useApp.getState().setSettings({
+							naiOfficialKey: v,
+							naiOfficialConnected: Boolean(s.naiOfficialConnected && v === (s.naiOfficialKey ?? ""))
+						});
+					}
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "mb-1 mt-1 text-[11px] text-muted",
+					children: [
+						"一般以 pst- 开头。地址固定为 ",
+						NAI_OFFICIAL_BASE,
+						"，不能改。"
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-3 flex h-5 justify-end",
+					children: settings.naiOfficialConnected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "text-[12px] text-muted",
+						onClick: () => {
+							useApp.getState().setSettings({ naiOfficialConnected: false });
+							useApp.getState().toast("已退出官网");
+						},
+						children: "退出"
+					}) : null
+				}),
+				err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mb-2 text-[12px] text-danger",
+					children: err
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
+					className: cn(officialOn && "bg-good hover:bg-good"),
+					busy,
+					onClick: () => void connectOfficial(),
+					children: officialOn ? "已连接" : "连接"
+				})
+			] }),
+			liveOther ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-3 text-[12px] text-muted",
+				children: [
+					"生图目前仍走",
+					source === "official" ? "官网" : "中转站",
+					"。连接这边后会改过来，另一边会断开，密钥还留在输入框里。"
+				]
+			}) : null
+		]
+	});
+}
+function patchActivePreset(map) {
+	const s = useApp.getState().settings;
+	const id = s.stPresetId;
+	if (!id) return;
+	useApp.getState().setSettings({ stPresets: (s.stPresets ?? []).map((p) => p.id === id ? map(p) : p) });
+}
+function PresetSheet({ onClose }) {
+	const settings = useApp((s) => s.settings);
+	const params = settings.llmParams;
+	const preset = (settings.stPresets ?? []).find((p) => p.id === settings.stPresetId) ?? null;
+	const [edit, setEdit] = (0, import_react.useState)(null);
+	const patchParam = (partial) => {
+		const cur = useApp.getState().settings.llmParams;
+		useApp.getState().setSettings({ llmParams: {
+			...cur,
+			...partial
+		} });
+	};
+	const setItemEnabled = (item, on) => {
+		if (!item.usable) return;
+		patchActivePreset((p) => {
+			if (!p.items) return p;
+			return sealPreset({
+				...p,
+				items: p.items.map((row) => row.id === item.id ? {
+					...row,
+					enabled: on
+				} : row)
+			});
+		});
+	};
+	const saveEdit = () => {
+		if (!edit || edit.readOnly) return;
+		const text = edit.text;
+		const id = edit.id;
+		patchActivePreset((p) => {
+			if (!p.items) return p;
+			return sealPreset({
+				...p,
+				items: p.items.map((row) => row.id === id ? {
+					...row,
+					content: text
+				} : row)
+			});
+		});
+		setEdit(null);
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(SheetCard, {
+		title: "预设设置",
+		onClose,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChatPresetPicker, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-4 grid grid-cols-3 gap-2",
+				children: [
+					[
+						"chat",
+						"对话",
+						Boolean(settings.stUseChat)
+					],
+					[
+						"image",
+						"生图",
+						Boolean(settings.stUseImage)
+					],
+					[
+						"wechat",
+						"微信",
+						Boolean(settings.stUseWechat)
+					]
+				].map(([part, label, on]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex flex-col items-center gap-1.5",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "text-[13px]",
+						children: label
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
+						on,
+						onChange: (v) => setPresetUse(part, v),
+						label
+					})]
+				}, part))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mb-2 mt-5 flex items-center justify-between",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "text-[14px] font-medium",
+					children: "参数管理"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "text-[12px] text-muted",
+					onClick: () => {
+						const cur = useApp.getState().settings.llmParams;
+						useApp.getState().setSettings({ llmParams: defaultSampler(cur) });
+					},
+					children: "恢复默认"
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "温度",
+				value: params.temperature,
+				min: 0,
+				max: 2,
+				step: .01,
+				locked: params.temperatureLocked,
+				onLock: (v) => patchParam({ temperatureLocked: v }),
+				onChange: (n) => patchParam({ temperature: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "Top P",
+				value: params.topP,
+				min: 0,
+				max: 1,
+				step: .01,
+				locked: params.topPLocked,
+				onLock: (v) => patchParam({ topPLocked: v }),
+				onChange: (n) => patchParam({ topP: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "频率惩罚",
+				value: params.frequencyPenalty,
+				min: -2,
+				max: 2,
+				step: .01,
+				locked: params.frequencyPenaltyLocked,
+				onLock: (v) => patchParam({ frequencyPenaltyLocked: v }),
+				onChange: (n) => patchParam({ frequencyPenalty: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "存在惩罚",
+				value: params.presencePenalty,
+				min: -2,
+				max: 2,
+				step: .01,
+				locked: params.presencePenaltyLocked,
+				onLock: (v) => patchParam({ presencePenaltyLocked: v }),
+				onChange: (n) => patchParam({ presencePenalty: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "最大长度",
+				value: params.maxTokens,
+				min: 256,
+				max: 131072,
+				step: 1,
+				digits: 0,
+				locked: params.maxTokensLocked,
+				onLock: (v) => patchParam({ maxTokensLocked: v }),
+				onChange: (n) => patchParam({ maxTokens: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ParamRow, {
+				label: "上下文轮数",
+				value: params.contextTurns,
+				min: 4,
+				max: 80,
+				step: 1,
+				digits: 0,
+				locked: params.contextTurnsLocked,
+				onLock: (v) => patchParam({ contextTurnsLocked: v }),
+				onChange: (n) => patchParam({ contextTurns: n })
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mb-2 mt-4 text-[14px] font-medium",
+				children: "内容开关"
+			}),
+			!preset ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[12px] text-muted",
+				children: "先选择一份预设。"
+			}) : !preset.items?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[12px] leading-relaxed text-muted",
+				children: "这是以前导入的预设，只有整段文字，没有一条条开关。重新导入后才能逐条开关，现在仍按原来的整段发送。"
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: preset.items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex items-center gap-2 border-b border-line/70 py-2.5 last:border-0",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: cn("min-w-0 flex-1 truncate text-[13px]", item.usable ? item.enabled ? "font-semibold text-ink" : "text-ink" : "text-faint"),
+						children: item.name
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: cn("grid size-8 shrink-0 place-items-center", item.usable ? "text-muted" : "text-faint"),
+						"aria-label": item.usable ? `编辑${item.name}` : `查看${item.name}`,
+						onClick: () => setEdit({
+							id: item.id,
+							name: item.name,
+							text: item.content,
+							readOnly: !item.usable
+						}),
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-3.5" })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Switch, {
+						on: Boolean(item.usable && item.enabled),
+						disabled: !item.usable,
+						label: item.name,
+						onChange: (v) => setItemEnabled(item, v)
+					})
+				]
+			}, item.id)) }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Modal, {
+				open: Boolean(edit),
+				onClose: () => setEdit(null),
+				title: edit?.name || "内容",
+				wide: true,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextArea, {
+					className: cn("min-h-[200px]", edit?.readOnly && "text-muted"),
+					value: edit?.text ?? "",
+					readOnly: edit?.readOnly,
+					onChange: (e) => {
+						const text = e.target.value;
+						setEdit((cur) => cur ? {
+							...cur,
+							text
+						} : cur);
+					}
+				}), edit?.readOnly ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mt-2 text-[12px] text-muted",
+					children: "这一条绘语用不上，只给查看，不会发送。"
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryBtn, {
+					className: "mt-4",
+					onClick: saveEdit,
+					children: "保存"
+				})]
+			})
+		]
 	});
 }
 function AccountPicker({ accounts, keyValue, onKeyChange, busy, exit, onPick, onDelete }) {
@@ -11306,22 +11827,32 @@ function ModelPicker({ models, current, starred, connected, onPick, onStar }) {
 		}), document.body)]
 	});
 }
-function ParamRow({ label, value, min, max, step, digits = 2, onChange }) {
+function ParamRow({ label, value, min, max, step, digits = 2, locked, onLock, onChange }) {
 	const shown = digits === 0 ? String(Math.round(value)) : value.toFixed(digits);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "mb-3",
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "mb-0.5 flex items-center justify-between text-[13px]",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: label }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-				className: "tabular-nums text-muted",
-				children: shown
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: locked ? "text-muted" : void 0,
+				children: label
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				className: "flex items-center gap-1.5 tabular-nums text-muted",
+				children: [shown, onLock ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: locked ? "text-primary" : "text-muted",
+					onClick: () => onLock(!locked),
+					"aria-label": locked ? "解锁" : "锁定",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "size-3.5" })
+				}) : null]
 			})]
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Slider, {
 			value,
 			min,
 			max,
 			step,
-			onChange
+			onChange,
+			disabled: locked
 		})]
 	});
 }
@@ -11825,7 +12356,7 @@ function RoleEditor({ chat, mode }) {
 		}));
 		useApp.getState().commitChat(chat.id);
 		if (mode === "create") {
-			const { sendOpening } = await import("./chat-actions-TMj17Ods.mjs");
+			const { sendOpening } = await import("./chat-actions-C7kwt3LR.mjs");
 			sendOpening(chat.id);
 		} else useApp.getState().toast("设定已保存");
 	};
@@ -14561,13 +15092,15 @@ function PurePane() {
 						setViewId(id);
 					});
 				},
-				onClose: closeSheet
+				onClose: closeSheet,
+				onOpenFav: () => setSheet("fav")
 			}),
 			sheet === "fav" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FavSheet, {
 				currentBlob: item?.blobId,
 				previewId: peekId,
 				onPreview: setPeekId,
-				onClose: closeSheet
+				onClose: closeSheet,
+				onOpenParams: () => setSheet("params")
 			}),
 			sheet === "hist" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(HistSheet, {
 				items: done,
@@ -14641,7 +15174,7 @@ function applyPureParams(next) {
 		img2imgNoise: next.img2imgNoise ?? 0
 	});
 }
-function FavSheet({ currentBlob, previewId, onPreview, onClose }) {
+function FavSheet({ currentBlob, previewId, onPreview, onClose, onOpenParams }) {
 	const favorites = useApp((s) => s.favorites);
 	const favGroups = useApp((s) => s.favGroups);
 	const [openId, setOpenId] = (0, import_react.useState)(null);
@@ -15036,8 +15569,10 @@ function FavSheet({ currentBlob, previewId, onPreview, onClose }) {
 			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "flex shrink-0 items-center gap-1.5 px-4 py-3",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
 						className: "shrink-0 text-[16px] font-semibold",
+						onClick: onOpenParams,
 						children: "收藏"
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -15763,7 +16298,7 @@ function HistCell({ item, active, onPreview }) {
 		]
 	});
 }
-function PureParamsSheet({ onClose, phase, left, onDraw }) {
+function PureParamsSheet({ onClose, onOpenFav, phase, left, onDraw }) {
 	const chat = fakePureChat(useApp((s) => s.pureParams), useApp((s) => s.settings.grokModelId));
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "absolute inset-0 z-30 flex flex-col bg-overlay/40",
@@ -15772,13 +16307,15 @@ function PureParamsSheet({ onClose, phase, left, onDraw }) {
 			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "relative flex h-12 shrink-0 items-center px-4",
 				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "font-serif text-[18px] leading-none",
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "font-serif text-[18px] leading-[26px]",
+						onClick: onOpenFav,
 						children: "参数设置"
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 						type: "button",
-						className: "absolute left-1/2 top-1/2 inline-flex h-[18px] min-w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary px-2.5 text-[13px] leading-none text-on-primary",
+						className: "absolute left-1/2 top-1/2 inline-flex h-[26px] min-w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-primary px-3 text-[15px] leading-none text-on-primary",
 						onClick: onDraw,
 						children: phase ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "size-3.5 animate-spin" }) : left > 0 ? `${left}s` : "绘图"
 					}),
@@ -15861,8 +16398,9 @@ function ReadMeta() {
 async function drawOne(setPhase, showId) {
 	const params = useApp.getState().pureParams;
 	const settings = useApp.getState().settings;
-	if (!settings.naiKey) {
-		useApp.getState().toast("还没连接 NAI");
+	const auth = naiDrawAuth(settings);
+	if (!auth) {
+		useApp.getState().toast("还没连接生图");
 		useApp.getState().setUI({ connection: true });
 		return;
 	}
@@ -15878,12 +16416,13 @@ async function drawOne(setPhase, showId) {
 			chat: fakePureChat(params, settings.grokModelId),
 			grokTail: "",
 			seed,
-			apiKey: settings.naiKey,
-			baseUrl: settings.naiBase,
+			apiKey: auth.apiKey,
+			baseUrl: auth.baseUrl,
+			mode: auth.mode,
 			signal: ac.signal,
 			onStart: () => setPhase("generating"),
 			onReceiving: () => {
-				useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
+				if (auth.mode === "proxy") useApp.getState().setCooldown(Date.now() + COOLDOWN_MS);
 				setPhase("receiving");
 			}
 		});
@@ -16891,7 +17430,7 @@ function MultiCreateModal() {
 					const draft = makeDraft();
 					pushDraft(draft);
 					useApp.getState().commitChat(draft.id);
-					const { sendOpening } = await import("./chat-actions-TMj17Ods.mjs");
+					const { sendOpening } = await import("./chat-actions-C7kwt3LR.mjs");
 					sendOpening(draft.id);
 				},
 				children: "跳过，开始聊天"
@@ -16906,4 +17445,4 @@ function Home() {
 	});
 }
 //#endregion
-export { imagePresetStyle as A, pruneStarred as B, defaultSettings as C, idb_exports as D, getImage as E, loadAll as F, restoreSampler as G, randomSeed as H, moveId as I, sortHistoryNewestFirst as J, samplerPatch as K, nearestScroller as L, imageWriteFields as M, indexFromY as N, imageAiLabel as O, llmIdentity as P, wechatPresetStyle as Q, parseChatCompletionPreset as R, db as S, downloadBlob as T, rememberUrl as U, putImage as V, resolveImageWrite as W, uniqueNumberedName as X, uid as Y, uniquePresetName as Z, applyLlmPick as _, cancelMemory as a, chatPickerModels as b, regenMessage as c, Home as component, sendOpening as d, sendUser as f, applyImageAiPick as g, activePreset as h, cancelImage as i, imageUrl as j, imagePickerModels as k, retryMemory as l, FOLLOW_IMAGE_AI as m, attachImage as n, editMessage as o, routes_0c1R9zPH_exports as p, snapshotLlmAccount as q, branchFrom as r, invalidateMemory as s, abortChat as t, runManualMemory as u, autoScrollNearEdge as v, deleteImage as w, cn as x, cachedUrl as y, presetStyle as z };
+export { wechatPresetStyle as $, imagePresetStyle as A, pruneStarred as B, defaultSettings as C, idb_exports as D, getImage as E, loadAll as F, restoreSampler as G, randomSeed as H, moveId as I, snapshotLlmAccount as J, samplerPatch as K, nearestScroller as L, imageWriteFields as M, indexFromY as N, imageAiLabel as O, llmIdentity as P, uniquePresetName as Q, parseChatCompletionPreset as R, defaultSampler as S, downloadBlob as T, rememberUrl as U, putImage as V, resolveImageWrite as W, uid as X, sortHistoryNewestFirst as Y, uniqueNumberedName as Z, autoScrollNearEdge as _, cancelMemory as a, cn as b, regenMessage as c, Home as component, sendOpening as d, sendUser as f, applyLlmPick as g, applyImageAiPick as h, cancelImage as i, imageUrl as j, imagePickerModels as k, retryMemory as l, FOLLOW_IMAGE_AI as m, attachImage as n, editMessage as o, routes_BYUT84xK_exports as p, sealPreset as q, branchFrom as r, invalidateMemory as s, abortChat as t, runManualMemory as u, cachedUrl as v, deleteImage as w, db as x, chatPickerModels as y, presetStyle as z };

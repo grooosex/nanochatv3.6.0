@@ -1,0 +1,1 @@
+import{f as e}from"./routes-BfmhBV91.js";export{e as sendOpening};

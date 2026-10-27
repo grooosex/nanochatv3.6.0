@@ -3,7 +3,7 @@ import { _ as lazyRouteComponent, b as useRouter, f as Scripts, g as Outlet, h a
 import { r as unzipSync } from "../_libs/fflate.mjs";
 import { i as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-CCtQaUUZ.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-QasONoEq.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -1145,7 +1145,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-D1-9Rtt6.css";
+var styles_default = "/assets/styles-CTvDnEy8.css";
 var APP_NAME = "绘语";
 var Route$4 = createRootRoute({
 	head: () => ({
@@ -1195,7 +1195,7 @@ var Route$4 = createRootRoute({
 		] })]
 	})
 });
-var $$splitComponentImporter = () => import("./routes-0c1R9zPH.mjs").then((n) => n.p);
+var $$splitComponentImporter = () => import("./routes-BYUT84xK.mjs").then((n) => n.p);
 var Route$3 = createFileRoute("/")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
 var GROK_MODELS = {
 	"grok-4.7-high": {
@@ -1623,6 +1623,73 @@ var Route = createFileRoute("/api/nai")({ server: { handlers: { POST: async ({ r
 		ok: false,
 		error: "请填写 NAI API Key"
 	}, { status: 400 });
+	if (body.action === "official-test") try {
+		const r = await fetch("https://image.novelai.net/user/subscription", { headers: { Authorization: `Bearer ${key}` } });
+		if (r.status === 401 || r.status === 403) return Response.json({
+			ok: false,
+			error: "官网密钥无效"
+		});
+		if (!r.ok) return Response.json({
+			ok: false,
+			error: "官网连接失败"
+		});
+		return Response.json({ ok: true });
+	} catch (e) {
+		return Response.json({
+			ok: false,
+			error: e instanceof Error ? e.message : "无法连接官网"
+		});
+	}
+	if (body.action === "official") try {
+		const r = await fetch("https://image.novelai.net/ai/generate-image", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${key}`,
+				"Content-Type": "application/json",
+				Accept: "application/zip, application/json"
+			},
+			body: JSON.stringify(body.payload ?? {}),
+			signal: AbortSignal.timeout(11e4)
+		});
+		const u8 = new Uint8Array(await r.arrayBuffer());
+		if (!r.ok) {
+			const text = new TextDecoder().decode(u8);
+			let msg = "";
+			try {
+				const j = JSON.parse(text);
+				msg = j.message || j.error || "";
+			} catch {
+				msg = text.slice(0, 180);
+			}
+			if (r.status === 401 || r.status === 403) return Response.json({
+				ok: false,
+				error: "官网密钥无效"
+			});
+			if (r.status === 402) return Response.json({
+				ok: false,
+				error: "官网额度不足"
+			});
+			return Response.json({
+				ok: false,
+				error: msg || `官网 ${r.status}`
+			});
+		}
+		const png = extractPng(u8);
+		if (!png) return Response.json({
+			ok: false,
+			error: "官网没有返回图片"
+		});
+		return Response.json({
+			ok: true,
+			image: toB64(png)
+		});
+	} catch (e) {
+		const abort = (e instanceof DOMException || e instanceof Error) && (e.name === "AbortError" || e.name === "TimeoutError");
+		return Response.json({
+			ok: false,
+			error: abort ? "官网生图超时" : e instanceof Error ? e.message : "官网生图失败"
+		});
+	}
 	if (body.action === "test") try {
 		const r = await fetch(`${base}/api/user`, { headers: { Authorization: `Bearer ${key}` } });
 		const text = await r.text();

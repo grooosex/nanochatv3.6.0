@@ -9,6 +9,25 @@ import {
 import type { CharacterPrompt, ImageParams, NaiModelId } from "./types";
 import { randomSeed } from "./utils";
 
+export const NAI_OFFICIAL_BASE = "https://image.novelai.net";
+
+export function naiDrawAuth(settings: {
+  naiImageSource?: "proxy" | "official";
+  naiOfficialConnected?: boolean;
+  naiOfficialKey?: string;
+  naiConnected?: boolean;
+  naiKey?: string;
+  naiBase?: string;
+}): { mode: "proxy" | "official"; apiKey: string; baseUrl: string } | null {
+  if (settings.naiImageSource === "official" && settings.naiOfficialConnected && settings.naiOfficialKey?.trim()) {
+    return { mode: "official", apiKey: settings.naiOfficialKey.trim(), baseUrl: NAI_OFFICIAL_BASE };
+  }
+  if (settings.naiConnected && settings.naiKey?.trim()) {
+    return { mode: "proxy", apiKey: settings.naiKey.trim(), baseUrl: settings.naiBase || "https://api.idlecloud.cc" };
+  }
+  return null;
+}
+
 export function naiMeta(model: NaiModelId) {
   return NAI_MODELS.find((m) => m.id === model);
 }

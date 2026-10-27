@@ -108,7 +108,7 @@ export const Route = createFileRoute("/api/nai")({
     handlers: {
       POST: async ({ request }) => {
         const body = (await request.json()) as {
-          action?: "test" | "submit" | "poll" | "fetch" | "generate";
+          action?: "test" | "submit" | "poll" | "fetch" | "generate" | "official" | "official-test";
           baseUrl?: string;
           apiKey?: string;
           payload?: unknown;
@@ -120,6 +120,54 @@ export const Route = createFileRoute("/api/nai")({
         const base = normalizeBase(body.baseUrl || "https://api.idlecloud.cc");
         const key = (body.apiKey || "").trim();
         if (!key) return Response.json({ ok: false, error: "请填写 NAI API Key" }, { status: 400 });
+
+        if (body.action === "official-test") {
+          try {
+            const r = await fetch("https://image.novelai.net/user/subscription", {
+              headers: { Authorization: `Bearer ${key}` },
+            });
+            if (r.status === 401 || r.status === 403) return Response.json({ ok: false, error: "官网密钥无效" });
+            if (!r.ok) return Response.json({ ok: false, error: "官网连接失败" });
+            return Response.json({ ok: true });
+          } catch (e) {
+            return Response.json({ ok: false, error: e instanceof Error ? e.message : "无法连接官网" });
+          }
+        }
+
+        if (body.action === "official") {
+          try {
+            const r = await fetch("https://image.novelai.net/ai/generate-image", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${key}`,
+                "Content-Type": "application/json",
+                Accept: "application/zip, application/json",
+              },
+              body: JSON.stringify(body.payload ?? {}),
+              signal: AbortSignal.timeout(110000),
+            });
+            const u8 = new Uint8Array(await r.arrayBuffer());
+            if (!r.ok) {
+              const text = new TextDecoder().decode(u8);
+              let msg = "";
+              try {
+                const j = JSON.parse(text) as { message?: string; error?: string };
+                msg = j.message || j.error || "";
+              } catch {
+                msg = text.slice(0, 180);
+              }
+              if (r.status === 401 || r.status === 403) return Response.json({ ok: false, error: "官网密钥无效" });
+              if (r.status === 402) return Response.json({ ok: false, error: "官网额度不足" });
+              return Response.json({ ok: false, error: msg || `官网 ${r.status}` });
+            }
+            const png = extractPng(u8);
+            if (!png) return Response.json({ ok: false, error: "官网没有返回图片" });
+            return Response.json({ ok: true, image: toB64(png) });
+          } catch (e) {
+            const abort = (e instanceof DOMException || e instanceof Error) && (e.name === "AbortError" || e.name === "TimeoutError");
+            return Response.json({ ok: false, error: abort ? "官网生图超时" : e instanceof Error ? e.message : "官网生图失败" });
+          }
+        }
 
         if (body.action === "test") {
           try {

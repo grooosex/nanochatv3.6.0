@@ -342,12 +342,12 @@ export const useApp = create<State>((set, get) => ({
       if (next !== mapped) persistChat(next);
       return next;
     });
-    const settings = {
+    const settings: Settings = {
       ...data.settings,
       grokModelId: migrateGrokId(data.settings.grokModelId),
-      theme: data.settings.theme === "dark" ? ("dark" as const) : ("light" as const),
+      theme: data.settings.theme === "dark" ? "dark" : "light",
       llmParams: data.settings.llmParams,
-      chatSource: data.settings.chatSource === "api" && data.settings.llmConnected ? ("api" as const) : ("grok" as const),
+      chatSource: data.settings.chatSource === "api" && data.settings.llmConnected ? "api" : "grok",
     };
     const savedId = (currentRow?.value as string) || null;
     const currentId = live.some((c) => c.id === savedId)
